@@ -11,7 +11,7 @@ import { element, inside, widgetStory } from "../storybook/story"
  * The menus and messages: Menu, Ribbon, ContextMenu (also on the rows of a
  * Grid, with the mouse and the keyboard), and confirm, alert, message and tooltip as Effects.
  */
-const meta: Meta = { title: "Menus and messages" }
+const meta: Meta = { title: "Suite/Menus and messages" }
 export default meta
 type Story = StoryObj
 
@@ -68,10 +68,10 @@ export const GridRows: Story = {
   render: () =>
     widgetStory(Effect.gen(function* () {
       const rows = yield* SubscriptionRef.make<ReadonlyArray<{ id: string; title: string; status: string }>>([
-        { id: "075", title: "Frames", status: "done" },
-        { id: "076", title: "Data", status: "done" },
-        { id: "077", title: "Forms", status: "done" },
-        { id: "078", title: "Menus and messages", status: "doing" }
+        { id: "075", title: "Suite/Frames", status: "done" },
+        { id: "076", title: "Suite/Data", status: "done" },
+        { id: "077", title: "Suite/Forms", status: "done" },
+        { id: "078", title: "Suite/Menus and messages", status: "doing" }
       ])
       const data = yield* dataCollection(rows)
       const [log, table] = yield* column([

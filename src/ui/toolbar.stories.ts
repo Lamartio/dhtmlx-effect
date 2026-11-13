@@ -5,7 +5,7 @@ import { element, inside, widgetStory } from "../storybook/story"
 import { toolbar, toolbarButton, toolbarSeparator, toolbarSpacer, toolbarTitle } from "./toolbar"
 
 /** The DHTMLX Toolbar. Its items need a ToolbarSlot, as a widget needs a Host. */
-const meta: Meta = { title: "Toolbar" }
+const meta: Meta = { title: "Suite/Toolbar" }
 export default meta
 type Story = StoryObj
 

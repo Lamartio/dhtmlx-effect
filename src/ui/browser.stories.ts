@@ -7,7 +7,7 @@ import { element, widgetStory } from "../storybook/story"
  * The Browser service itself: what a widget gets from it. In the book the layer comes from the
  * toolbar of Storybook and the size of the frame; in the app it comes from the real browser.
  */
-const meta: Meta = { title: "Browser layer" }
+const meta: Meta = { title: "Core/Browser layer" }
 export default meta
 type Story = StoryObj
 

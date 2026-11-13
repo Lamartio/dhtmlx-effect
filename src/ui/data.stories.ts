@@ -11,17 +11,17 @@ import { element, inside, widgetStory } from "../storybook/story"
  * The data widgets: Grid, Tree, List and DataView, on one bridge from a store
  * (a SubscriptionRef of rows) to the data collections of DHTMLX.
  */
-const meta: Meta = { title: "Data" }
+const meta: Meta = { title: "Suite/Data" }
 export default meta
 type Story = StoryObj
 
 type Issue = { readonly id: string; readonly title: string; readonly status: string; readonly parent?: string }
 
 const issues = (): ReadonlyArray<Issue> => [
-  { id: "075", title: "Frames", status: "doing" },
-  { id: "076", title: "Data", status: "todo" },
-  { id: "077", title: "Forms", status: "todo" },
-  { id: "078", title: "Menus and messages", status: "todo" },
+  { id: "075", title: "Suite/Frames", status: "doing" },
+  { id: "076", title: "Suite/Data", status: "todo" },
+  { id: "077", title: "Suite/Forms", status: "todo" },
+  { id: "078", title: "Suite/Menus and messages", status: "todo" },
   { id: "079", title: "Scheduler", status: "todo" },
   { id: "080", title: "Kanban", status: "todo" }
 ]

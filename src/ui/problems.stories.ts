@@ -9,7 +9,7 @@ import { element, inside, widgetStory } from "../storybook/story"
  * When a part of a widget stops: a red bar at the top of the island says what stopped,
  * and the rest of the widget goes on. The details are in the console.
  */
-const meta: Meta = { title: "Problems" }
+const meta: Meta = { title: "Core/Problems" }
 export default meta
 type Story = StoryObj
 

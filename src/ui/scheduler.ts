@@ -7,7 +7,7 @@ import { reporting } from "./problems"
 import { Host, resource } from "./host"
 
 /**
- * The DHTMLX Scheduler, community edition (GPL-2.0, as the Gantt), as a part of the Effect tree:
+ * The DHTMLX Scheduler, community edition (GPL-2.0), as a part of the Effect tree:
  * a calendar of events with a start and an end.
  */
 

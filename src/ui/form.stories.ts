@@ -11,7 +11,7 @@ import { element, inside, widgetStory } from "../storybook/story"
  * The forms: a Form made from an Effect Schema, and its inputs alone. Change
  * Locale and Zone in the toolbar: the date format, the calendar and the clock follow.
  */
-const meta: Meta = { title: "Forms" }
+const meta: Meta = { title: "Suite/Forms" }
 export default meta
 type Story = StoryObj
 

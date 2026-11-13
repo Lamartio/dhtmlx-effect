@@ -4,7 +4,7 @@ import { button } from "./button"
 import { element, inside, widgetStory } from "../storybook/story"
 
 /** The standalone button: the CSS of DHTMLX on a plain button, with its clicks as a stream. */
-const meta: Meta = { title: "Button" }
+const meta: Meta = { title: "Suite/Button" }
 export default meta
 type Story = StoryObj
 

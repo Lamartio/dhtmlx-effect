@@ -140,7 +140,11 @@ A fiber of a widget that dies reports to the `Problems` service. `mount` shows t
 
 The code in this repository is under the [MIT licence](./LICENSE). It contains no DHTMLX code.
 
-DHTMLX has its own licences. The free editions of the Suite, the Gantt, the Scheduler and the Kanban are under GPL-2.0, so an app that ships them must follow the GPL too. For a closed app, buy a commercial licence from DHTMLX. This text is not legal advice: read the licence of each DHTMLX package that you use.
+DHTMLX has its own licences. On npm, the free Gantt (`dhtmlx-gantt` 10) is under MIT. The free editions of the Suite, the Scheduler and the Kanban are under GPL-2.0, so an app that ships them must follow the GPL too. For a closed app, buy a commercial licence from DHTMLX. This text is not legal advice: read the licence of each DHTMLX package that you use.
+
+## Components
+
+[docs/components.md](./docs/components.md) lists each product and widget of DHTMLX, and what this repository has for it: 22 are wrapped, and 16 have an empty listing in the book.
 
 ## Develop
 

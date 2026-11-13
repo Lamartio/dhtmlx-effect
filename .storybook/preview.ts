@@ -23,7 +23,8 @@ const withSuiteTheme = (widget: Widget): Widget =>
 const preview: Preview = {
   ...browserGlobals,
   decorators: [browserDecorator({ around: withSuiteTheme })],
-  parameters: { layout: "fullscreen" }
+  // The wrapped products first, then the listings of what has no wrapper yet (docs/components.md).
+  parameters: { layout: "fullscreen", options: { storySort: { method: "alphabetical", order: ["Core", "Suite", "Gantt", "Scheduler", "Kanban", "*"] } } }
 }
 
 export default preview
