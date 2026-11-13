@@ -17,7 +17,7 @@
     "./storybook.css": "./src/storybook.css",
     "./package.json": "./package.json"
   },
-  "files": ["src", "!src/**/*.test.ts", "!src/**/*.stories.ts", "!src/examples"],
+  "files": ["src", "!src/**/*.test.ts", "!src/**/*.stories.ts", "!src/examples", "!src/todo"],
   "scripts": {
     "typecheck": "tsc -p .",
     "test": "bun scripts/test.ts",

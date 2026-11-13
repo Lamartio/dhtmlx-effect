@@ -10,7 +10,7 @@ import { element, inside, widgetStory } from "../storybook/story"
  * The life of a tree. Mount runs a planner in a scope; Unmount closes that scope. The counts show each
  * DHTMLX object and listener that lives: after Unmount, only the buttons of this page are left.
  */
-const meta: Meta = { title: "Lifecycle" }
+const meta: Meta = { title: "Core/Lifecycle" }
 export default meta
 type Story = StoryObj
 

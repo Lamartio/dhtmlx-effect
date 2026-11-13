@@ -15,7 +15,7 @@ import { toolbar, toolbarButton, toolbarSpacer, toolbarTitle } from "./toolbar"
  * The frames: Layout, Tabbar, Sidebar, Window and Popup. Each one holds parts
  * of the Effect tree; a part that leaves a frame closes its scope, so the counts go back.
  */
-const meta: Meta = { title: "Frames" }
+const meta: Meta = { title: "Suite/Frames" }
 export default meta
 type Story = StoryObj
 
