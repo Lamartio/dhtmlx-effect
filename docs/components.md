@@ -5,7 +5,7 @@ Each product and widget on [dhtmlx.com/docs/products](https://dhtmlx.com/docs/pr
 - **Wrapped**: there is a part in `src/ui/`, with stories and tests.
 - **Listing**: there is no part yet. The book has an empty listing for it, from `src/todo/`. When the part is there, its stories go next to its code, and the file in `src/todo/` goes.
 
-Count: 24 components are wrapped, and 15 listings are empty: 14 components, and the controls of the Form that are not there yet.
+Count: 29 components are wrapped, and 10 listings are empty: 9 components, and the controls of the Form that are not there yet.
 
 ## Products
 
@@ -16,7 +16,7 @@ Count: 24 components are wrapped, and 15 listings are empty: 14 components, and 
 | Scheduler | Calendar of events, as Outlook or Google Calendar | `dhtmlx-scheduler` | GPL-2.0 | Wrapped: `dhtmlx-effect/scheduler` |
 | Grid | Data grid. It is the Grid of the Suite, also sold alone | `dhx-suite`, `@dhtmlx/grid` | GPL-2.0 | Wrapped, in the Suite |
 | Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 21 wrapped, 2 listings |
-| Diagram | Flowcharts, org charts, mind maps, PERT charts, and a live editor | `@dhtmlx/diagram` | GPL-2.0 | 5 listings |
+| Diagram | Flowcharts, org charts, mind maps, PERT charts, and a live editor | `@dhtmlx/diagram` | GPL-2.0 | Wrapped: `dhtmlx-effect/diagram` |
 | Booking | Widget to book an appointment | `@dhtmlx/booking` | GPL-2.0 | Listing |
 | Kanban | Board of cards in columns | `@dhtmlx/kanban` | GPL-2.0 | Wrapped: `dhtmlx-effect/kanban` |
 | To Do List | Checklists with subtasks | `@dhtmlx/todolist` | GPL-2.0 | Listing |
@@ -110,11 +110,11 @@ Not widgets, but a part of the package: AJAX, AwaitRedraw (used here), CssManage
 
 ## Diagram
 
-One package, with four modes and an editor. Each one has a listing under Diagram.
+One package, with four modes and an editor. `diagram` in `src/ui/diagram.ts` draws the four modes by its `type`, and `diagramEditor` is the editor. Each one has a story under Diagram.
 
-| Listing | What it is |
+| Story | What it is |
 |---|---|
-| Diagram | The default mode: flowcharts, block diagrams, decision trees, swimlanes |
+| Flowchart | The default mode: flowcharts, block diagrams, decision trees, swimlanes |
 | Org chart | A hierarchy of people or departments |
 | Mind map | A core topic with branches |
 | PERT chart | Tasks in stages, with durations and dependencies |

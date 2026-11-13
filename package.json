@@ -4,7 +4,10 @@
   "description": "Run DHTMLX widgets (Suite, Gantt, Scheduler, Kanban) as Effect programs: a scope for each widget, streams for events, nothing left behind.",
   "license": "MIT",
   "type": "module",
-  "repository": { "type": "git", "url": "git+https://github.com/Lamartio/dhtmlx-effect.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lamartio/dhtmlx-effect.git"
+  },
   "keywords": ["dhtmlx", "effect", "effect-ts", "gantt", "scheduler", "kanban", "grid"],
   "exports": {
     ".": "./src/index.ts",
@@ -12,6 +15,7 @@
     "./gantt": "./src/gantt.ts",
     "./scheduler": "./src/scheduler.ts",
     "./kanban": "./src/kanban.ts",
+    "./diagram": "./src/diagram.ts",
     "./storybook": "./src/storybook.ts",
     "./styles.css": "./src/styles.css",
     "./storybook.css": "./src/storybook.css",
@@ -27,6 +31,7 @@
     "size": "bun scripts/size.ts"
   },
   "peerDependencies": {
+    "@dhtmlx/diagram": "^6.1.7",
     "@dhtmlx/kanban": "^1.7.3",
     "@effect/platform-browser": "^4.1.2",
     "@storybook/html-vite": "^10.0.0",
@@ -36,13 +41,25 @@
     "effect": "^4.1.2"
   },
   "peerDependenciesMeta": {
-    "@dhtmlx/kanban": { "optional": true },
-    "@storybook/html-vite": { "optional": true },
-    "dhtmlx-gantt": { "optional": true },
-    "dhtmlx-scheduler": { "optional": true },
-    "dhx-suite": { "optional": true }
+    "@dhtmlx/diagram": { "optional": true },
+    "@dhtmlx/kanban": {
+      "optional": true
+    },
+    "@storybook/html-vite": {
+      "optional": true
+    },
+    "dhtmlx-gantt": {
+      "optional": true
+    },
+    "dhtmlx-scheduler": {
+      "optional": true
+    },
+    "dhx-suite": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@dhtmlx/diagram": "6.1.7",
     "@dhtmlx/kanban": "1.7.3",
     "@effect/platform-browser": "4.1.2",
     "@effect/vitest": "4.1.2",
