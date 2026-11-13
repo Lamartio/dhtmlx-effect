@@ -66,7 +66,7 @@ One level deeper, from the docs of the Suite. A widget that is wrapped is not wr
 
 ### The controls of the Form
 
-The Form has 20 controls. `form` makes 10 of them from a field kind. The other 10 have one listing: Suite/Form controls.
+The Form has 20 controls. `form` makes 15 of them from a field kind. The other 5 have one listing: Suite/Form controls.
 
 | Control | Here |
 |---|---|
@@ -80,7 +80,13 @@ The Form has 20 controls. `form` makes 10 of them from a field kind. The other 1
 | Slider | The kind `slider` |
 | ColorPicker | The kind `color` |
 | Button | Only the submit button |
-| Avatar, CheckboxGroup, Container, Fieldset, RadioGroup, SimpleVault, Spacer, Text, Toggle, ToggleGroup | Not yet |
+| RadioGroup | The kind `radio`: one option, as a string |
+| CheckboxGroup | The kind `checks`: the chosen options, as an array |
+| Toggle | The kind `toggle`: a boolean |
+| ToggleGroup | The kind `toggles`: the chosen options, as an array |
+| Text | The kind `note`: a value that the user cannot change |
+| Avatar, SimpleVault | Not yet: they hold files |
+| Container, Fieldset, Spacer | Not yet: they shape the layout |
 
 ### The types of the Chart
 

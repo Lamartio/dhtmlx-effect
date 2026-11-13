@@ -207,3 +207,81 @@ it.live("shows an error under an empty date, time or slider field too, after a s
     expect([...host.querySelectorAll(".dhxe-form-errors li")].map((one) => one.textContent)).toEqual(["At: Missing key", "Points: From 0 to 13"])
     expect(host.textContent).toContain("From 0 to 13")
   })))
+
+const SIZES = [{ value: "s", label: "Small" }, { value: "m", label: "Medium" }, { value: "l", label: "Large" }]
+const TAGS = [{ value: "bug", label: "Bug" }, { value: "idea", label: "Idea" }, { value: "docs", label: "Docs" }]
+const DAYS = [{ value: "mon", label: "Mon" }, { value: "tue", label: "Tue" }, { value: "wed", label: "Wed" }]
+
+const Choices = Schema.Struct({
+  size: Schema.Literals(["s", "m", "l"]),
+  tags: Schema.Array(Schema.String),
+  urgent: Schema.Boolean,
+  days: Schema.Array(Schema.String),
+  ref: Schema.String
+})
+
+const CHOICE_FIELDS = [
+  { name: "size", kind: "radio", options: SIZES },
+  { name: "tags", kind: "checks", options: TAGS },
+  { name: "urgent", kind: "toggle", label: "Urgent" },
+  { name: "days", kind: "toggles", options: DAYS },
+  { name: "ref", kind: "note", label: "Reference" }
+] as const
+
+it.live("shows a radio group, checks, a toggle, toggles and a note from the values, and follows a new value", () =>
+  run(Effect.gen(function* () {
+    const host = yield* Host
+    const values = yield* SubscriptionRef.make<Readonly<Record<string, unknown>>>({ size: "m", tags: ["bug", "docs"], urgent: true, days: ["tue"], ref: "X-17" })
+    const made = yield* form({ schema: Choices, values, fields: CHOICE_FIELDS, submitLabel: "" })
+    yield* settle
+    const value = (name: string) => (made.form.getItem(name) as unknown as { getValue: () => unknown }).getValue()
+    expect(value("size")).toBe("m")
+    expect(value("tags")).toEqual({ bug: true, idea: false, docs: true })
+    expect(value("urgent")).toBe(true)
+    expect(value("days")).toMatchObject({ tue: true })
+    expect(value("ref")).toBe("X-17")
+    expect(host.textContent).toContain("Medium")
+    expect(host.textContent).toContain("Idea")
+    expect(host.textContent).toContain("Urgent")
+    expect(host.textContent).toContain("Wed")
+    expect((yield* SubscriptionRef.get(made.checked))._tag).toBe("valid")
+
+    yield* SubscriptionRef.set(values, { size: "l", tags: ["idea"], urgent: false, days: ["mon", "wed"], ref: "X-18" })
+    yield* settle
+    expect(value("size")).toBe("l")
+    expect(value("tags")).toEqual({ bug: false, idea: true, docs: false })
+    expect(value("urgent")).toBe(false)
+    expect(value("days")).toMatchObject({ mon: true, wed: true })
+    expect(value("ref")).toBe("X-18")
+    // Nothing went back into the store: the values are the ones that the code set.
+    expect(yield* SubscriptionRef.get(values)).toEqual({ size: "l", tags: ["idea"], urgent: false, days: ["mon", "wed"], ref: "X-18" })
+  })))
+
+it.live("writes a click on a radio button, a check, a toggle and a toggle of a group into the values", () =>
+  run(Effect.gen(function* () {
+    const host = yield* Host
+    const values = yield* SubscriptionRef.make<Readonly<Record<string, unknown>>>({ size: "m", tags: ["bug"], urgent: false, days: [], ref: "X-17" })
+    yield* form({ schema: Choices, values, fields: CHOICE_FIELDS, submitLabel: "" })
+    yield* settle
+    const now = (name: string) => Effect.map(SubscriptionRef.get(values), (all) => all[name])
+    const withText = (selector: string, text: string) => [...host.querySelectorAll<HTMLElement>(selector)].find((one) => one.textContent?.trim() === text)!
+
+    host.querySelectorAll<HTMLInputElement>('input[type="radio"]')[0]!.click()
+    yield* settle
+    expect(yield* now("size")).toBe("s")
+
+    host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1]!.click()
+    yield* settle
+    expect(yield* now("tags")).toEqual(["bug", "idea"])
+
+    withText("button", "Urgent").click()
+    yield* settle
+    expect(yield* now("urgent")).toBe(true)
+
+    withText("button", "Tue").click()
+    yield* settle
+    withText("button", "Mon").click()
+    yield* settle
+    // In the order of the options, not of the clicks.
+    expect(yield* now("days")).toEqual(["mon", "tue"])
+  })))

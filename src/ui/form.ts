@@ -6,14 +6,24 @@ import { child, Host, resource } from "./host"
 import { resourceAfterPaint } from "./paint"
 import { calendarNames } from "./inputs"
 
-/** The kinds of field. A day is `YYYY-MM-DD` and a time `HH:mm` (see `Day` and `Time` in core/form.ts). */
-export type FieldKind = "text" | "textarea" | "number" | "checkbox" | "select" | "combo" | "date" | "time" | "slider" | "color"
+/**
+ * The kinds of field. A day is `YYYY-MM-DD` and a time `HH:mm` (see `Day` and `Time` in core/form.ts).
+ *
+ * - `radio` is one of the options, as a string: the RadioGroup of DHTMLX.
+ * - `checks` and `toggles` are the chosen options, as an array of their values, in the order of the
+ *   options: the CheckboxGroup and the ToggleGroup.
+ * - `toggle` is a boolean: one Toggle button.
+ * - `note` shows its value as text that the user cannot change: the Text control.
+ */
+export type FieldKind =
+  | "text" | "textarea" | "number" | "checkbox" | "select" | "combo" | "date" | "time" | "slider" | "color"
+  | "radio" | "checks" | "toggle" | "toggles" | "note"
 
 export type Field = {
   readonly name: string
   readonly label?: string
   readonly kind?: FieldKind
-  /** The choices of a select or a combo. */
+  /** The choices of a select, a combo, a radio, checks or toggles. */
   readonly options?: ReadonlyArray<{ readonly value: string; readonly label: string }>
   /** The range of a slider. */
   readonly min?: number
@@ -85,8 +95,33 @@ const control = (field: Field, locale: ReturnType<typeof calendarLocale>) => {
       return { ...base, type: "slider", min: field.min ?? 0, max: field.max ?? 100, step: field.step ?? 1, tooltip: true }
     case "color":
       return { ...base, type: "colorpicker" }
+    case "radio":
+      return { ...base, type: "radiogroup", options: { rows: (field.options ?? []).map((option) => ({ type: "radiobutton", id: option.value, value: option.value, text: option.label })) } }
+    case "checks":
+      return { ...base, type: "checkboxgroup", options: { rows: (field.options ?? []).map((option) => ({ type: "checkbox", id: option.value, text: option.label })) } }
+    case "toggle":
+      // A Toggle has no label of its own: the label is the text on the button.
+      return { name: field.name, id: field.name, type: "toggle", text: base.label }
+    case "toggles":
+      return { name: field.name, id: field.name, type: "togglegroup", multiselection: true, options: (field.options ?? []).map((option) => ({ type: "toggle", id: option.value, text: option.label })) }
+    case "note":
+      return { ...base, type: "text" }
   }
 }
+
+/** The kinds whose value is a set of options. DHTMLX keeps it as an object: the id of each option, and if it is on. */
+const isGroup = (field: Field) => field.kind === "checks" || field.kind === "toggles"
+
+/** The chosen options of a group, in the order of the options. */
+const chosen = (field: Field, raw: unknown): ReadonlyArray<string> => {
+  if (typeof raw !== "object" || raw === null) return []
+  const on = raw as Record<string, unknown>
+  return (field.options ?? []).map((option) => option.value).filter((value) => on[value] !== undefined && on[value] !== false && on[value] !== "")
+}
+
+/** Two values of a field are the same: by value for the arrays of a group. */
+const same = (a: unknown, b: unknown) =>
+  a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((one, index) => one === b[index]))
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
@@ -101,7 +136,11 @@ const fromControl = (field: Field, raw: unknown): unknown => {
     case "slider":
       return Array.isArray(raw) ? raw[0] : Number(raw)
     case "checkbox":
+    case "toggle":
       return raw === true
+    case "checks":
+    case "toggles":
+      return chosen(field, raw)
     case "date":
       return raw instanceof Date ? dateToDay(raw) : raw === "" || raw === undefined ? undefined : String(raw)
     case "time": {
@@ -119,6 +158,11 @@ const fromControl = (field: Field, raw: unknown): unknown => {
 
 /** A value as the form keeps it, for the DHTMLX control. */
 const toControl = (field: Field, value: unknown): unknown => {
+  if (isGroup(field)) {
+    const on = new Set(Array.isArray(value) ? value.map(String) : [])
+    return Object.fromEntries((field.options ?? []).map((option) => [option.value, on.has(option.value)]))
+  }
+  if (field.kind === "toggle") return value === true
   if (value === undefined) return field.kind === "checkbox" ? false : ""
   if (field.kind === "date" && typeof value === "string") return dayToDate(value)
   return value
@@ -210,7 +254,9 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
           const field = fields.find((one) => one.name === name)
           if (applying || field === undefined) return
           touched.add(name)
-          const next = { ...Effect.runSync(SubscriptionRef.get(values)), [name]: fromControl(field, raw) }
+          // A group and a toggle give the event the part that changed: the whole value is in the item.
+          const whole = isGroup(field) || field.kind === "toggle" ? item(name)?.getValue() : raw
+          const next = { ...Effect.runSync(SubscriptionRef.get(values)), [name]: fromControl(field, whole) }
           if (next[name] === undefined) delete next[name]
           Effect.runSync(SubscriptionRef.set(values, next))
         }),
@@ -234,7 +280,9 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
         for (const field of fields) {
           const one = item(field.name)
           if (one === undefined) continue
-          if (fromControl(field, one.getValue()) !== next[field.name]) view.setValue({ [field.name]: toControl(field, next[field.name]) })
+          const shown = fromControl(field, one.getValue())
+          const wanted = isGroup(field) ? chosen(field, toControl(field, next[field.name])) : field.kind === "toggle" ? next[field.name] === true : next[field.name]
+          if (!same(shown, wanted)) view.setValue({ [field.name]: toControl(field, next[field.name]) })
         }
       } finally {
         applying = false

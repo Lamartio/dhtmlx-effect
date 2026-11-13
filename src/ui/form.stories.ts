@@ -79,6 +79,41 @@ export const FromSchema: Story = {
     }))
 }
 
+const Order = Schema.Struct({
+  size: Schema.Literals(["s", "m", "l"]),
+  extras: Schema.Array(Schema.String),
+  gift: Schema.Boolean,
+  days: Schema.Array(Schema.String).check(Schema.isMinLength(1, { message: "Choose at least one day" })),
+  ref: Schema.String
+})
+
+export const Choices: Story = {
+  name: "Radio, checks, toggles and a note",
+  render: () =>
+    widgetStory(Effect.gen(function* () {
+      const host = yield* Host
+      host.classList.add("dhxe-pane")
+      const values = yield* SubscriptionRef.make<Readonly<Record<string, unknown>>>({ size: "m", extras: ["wrap"], gift: false, days: [], ref: "Order 1042" })
+      const made = yield* form({
+        schema: Order,
+        values,
+        submitLabel: "Save",
+        fields: [
+          { name: "ref", kind: "note", label: "Reference" },
+          { name: "size", kind: "radio", options: [{ value: "s", label: "Small" }, { value: "m", label: "Medium" }, { value: "l", label: "Large" }] },
+          { name: "extras", kind: "checks", options: [{ value: "wrap", label: "Wrapping" }, { value: "card", label: "A card" }, { value: "fast", label: "Fast delivery" }] },
+          { name: "gift", kind: "toggle", label: "A gift" },
+          { name: "days", kind: "toggles", label: "Days", options: ["mon", "tue", "wed", "thu", "fri"].map((value) => ({ value, label: value })) }
+        ]
+      })
+      yield* element("p", "dhxe-note", "A group gives the values of its chosen options, in the order of the options. Save with no day shows the error of the Schema under the form.")
+      const now = yield* element("pre", "dhxe-log")
+      const sent = yield* element("pre", "dhxe-log")
+      yield* SubscriptionRef.changes(values).pipe(Stream.runForEach((value) => Effect.sync(() => (now.textContent = `values:\n${show(value)}`))), Effect.forkScoped)
+      yield* made.submitted.pipe(Stream.runForEach((value) => Effect.sync(() => (sent.textContent = `saved, typed:\n${show(value)}`))), Effect.forkScoped)
+    }))
+}
+
 export const Inputs: Story = {
   name: "Inputs alone",
   render: () =>
