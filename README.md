@@ -9,6 +9,8 @@ DHTMLX widgets are imperative: you make one, you change it, you call `destructor
 - **State changes the widget in place.** A widget follows a `SubscriptionRef` or a `Stream` and calls the DHTMLX API. There is no render, and no remount.
 - **Events are streams.** A button gives its clicks as a `Stream`. A Gantt writes a drag back into the `SubscriptionRef` of its plan.
 
+The book with each widget, live: [lamartio.github.io/dhtmlx-effect](https://lamartio.github.io/dhtmlx-effect/).
+
 This is not an official DHTMLX project.
 
 ## Status
