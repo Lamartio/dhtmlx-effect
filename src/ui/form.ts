@@ -2,8 +2,7 @@ import { Form, setTheme } from "dhx-suite"
 import { Effect, PubSub, Schema, Scope, Stream, SubscriptionRef } from "effect"
 import { calendarLocale, check, type Checked, dateToDay, dayToDate } from "../core/form"
 import { Browser, follow } from "./browser"
-import { child, Host, resource, type Widget } from "./host"
-import { slot } from "./slot"
+import { child, Host, resource } from "./host"
 import { resourceAfterPaint } from "./paint"
 import { calendarNames } from "./inputs"
 
@@ -18,17 +17,18 @@ import { calendarNames } from "./inputs"
  * - `avatar` is one picture, as an `AvatarValue`: the Avatar control.
  * - `files` is a list of picked files, as `FormFile`s: the SimpleVault control.
  *
- * Three kinds have no value. They shape the form:
+ * Two kinds have no value. They shape the form:
  *
  * - `fieldset` is a box with a label around its `fields`. The values of those fields stay in the
  *   one flat record of the form.
  * - `spacer` is empty room, with a `height`.
- * - `container` holds a `part`: any widget of the tree, such as a chart between the fields.
+ *
+ * The Container control of DHTMLX is not here: it is only in the PRO edition of the Suite.
  */
 export type FieldKind =
   | "text" | "textarea" | "number" | "checkbox" | "select" | "combo" | "date" | "time" | "slider" | "color"
   | "radio" | "checks" | "toggle" | "toggles" | "note" | "avatar" | "files"
-  | "fieldset" | "spacer" | "container"
+  | "fieldset" | "spacer"
 
 /** The picture of an `avatar` field: a link to it, or the file that the user picked. */
 export type AvatarValue = { readonly src?: string; readonly file?: File }
@@ -53,22 +53,17 @@ export type Field = {
   readonly fields?: ReadonlyArray<Field>
   /** A `fieldset` puts its fields under each other (`rows`, the default) or next to each other (`cols`). */
   readonly direction?: "rows" | "cols"
-  /** The part in a `container`. It gets an element in the form as its `Host`, and closes with the form. */
-  readonly part?: Widget
-  /** Pixels, for a `spacer` or a `container`. */
+  /** Pixels, for a `spacer`. */
   readonly height?: number
 }
 
 /** The kinds that shape the form and hold no value. */
-const isLayout = (field: Field) => field.kind === "fieldset" || field.kind === "spacer" || field.kind === "container"
+const isLayout = (field: Field) => field.kind === "fieldset" || field.kind === "spacer"
 
 /** Each field with a value, also the ones in a fieldset. */
 const leaves = (fields: ReadonlyArray<Field>): ReadonlyArray<Field> =>
   fields.flatMap((field) => (field.kind === "fieldset" ? leaves(field.fields ?? []) : isLayout(field) ? [] : [field]))
 
-/** Each field of a kind, also the ones in a fieldset. */
-const ofKind = (fields: ReadonlyArray<Field>, kind: FieldKind): ReadonlyArray<Field> =>
-  fields.flatMap((field) => [...(field.kind === kind ? [field] : []), ...(field.kind === "fieldset" ? ofKind(field.fields ?? [], kind) : [])])
 
 /** A field kind from the Schema, for a field that names none: a text, a number, a checkbox, or a select of literals. */
 const kindOf = (ast: Schema.Top["ast"]): { readonly kind: FieldKind; readonly options?: ReadonlyArray<{ readonly value: string; readonly label: string }> } => {
@@ -165,8 +160,6 @@ const control = (field: Field, locale: ReturnType<typeof calendarLocale>): unkno
       return { ...base, type: "simplevault", autosend: false, ...(field.accept === undefined ? {} : { accept: field.accept }) }
     case "spacer":
       return { name: field.name, id: field.name, type: "spacer", height: field.height ?? 16 }
-    case "container":
-      return { name: field.name, id: field.name, type: "container", ...(field.label === undefined ? {} : { label: field.label, labelPosition: "top" as const }), ...(field.height === undefined ? {} : { height: field.height }) }
     case "fieldset":
       return { name: field.name, id: field.name, type: "fieldset", label: field.label ?? "", [field.direction ?? "rows"]: (field.fields ?? []).map((one): unknown => control(one, locale)) }
   }
@@ -419,14 +412,6 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
       }
     })
     yield* follow(browser.dark, (dark) => setTheme(dark ? "dark" : "light", host))
-    // The part of each container: it gets an element of its own in the form, and closes before the form.
-    for (const field of ofKind(shape, "container")) {
-      if (field.part === undefined) continue
-      const box = view.getItem(field.name) as unknown as { readonly attachHTML: (html: string) => void } | undefined
-      if (box === undefined) continue
-      const element = yield* slot((html) => box.attachHTML(html))
-      yield* Effect.provideService(field.part, Host, element)
-    }
     return { form: view, values, checked, submitted: Stream.fromPubSub(submits) }
   }) as Effect.Effect<{
     readonly form: Form

@@ -4,7 +4,6 @@ import { Effect, Schema, Scope, SubscriptionRef } from "effect"
 import { expect } from "vitest"
 import "dhx-suite/codebase/suite.min.css"
 import "../styles.css"
-import { element } from "../storybook/story"
 import { Browser, browserWith, type BrowserFacts } from "./browser"
 import { type AvatarValue, type Field, fieldsOf, form, type FormFile } from "./form"
 import { alive, Host } from "./host"
@@ -46,8 +45,7 @@ const Person = Schema.Struct({ first: Schema.String, last: Schema.String, city: 
 
 const LAYOUT: ReadonlyArray<Field> = [
   { name: "who", kind: "fieldset", label: "Who", direction: "cols", fields: [{ name: "first" }, { name: "last", label: "Family name" }] },
-  { name: "gap", kind: "spacer", height: 24 },
-  { name: "extra", kind: "container", label: "More", height: 60, part: element("p", "inside", "A part inside the form") }
+  { name: "gap", kind: "spacer", height: 24 }
 ]
 
 /** Types in an input as a user does, so DHTMLX sends its change event. */
@@ -61,11 +59,11 @@ const type = (input: HTMLInputElement, text: string) => {
 
 it("takes the fields of a fieldset out of the top of the form, with their kind and label from the Schema", () => {
   const shape = fieldsOf(Person, LAYOUT)
-  expect(shape.map((field) => [field.name, field.kind])).toEqual([["city", "text"], ["member", "checkbox"], ["who", "fieldset"], ["gap", "spacer"], ["extra", "container"]])
+  expect(shape.map((field) => [field.name, field.kind])).toEqual([["city", "text"], ["member", "checkbox"], ["who", "fieldset"], ["gap", "spacer"]])
   expect(shape[2]?.fields?.map((field) => [field.name, field.kind, field.label])).toEqual([["first", "text", "First"], ["last", "text", "Family name"]])
 })
 
-it.live("draws a fieldset, a spacer and a container with a part, and keeps the values of the fields in a fieldset", () =>
+it.live("draws a fieldset and a spacer, and keeps the values of the fields in a fieldset", () =>
   run(Effect.gen(function* () {
     const host = yield* Host
     const values = yield* SubscriptionRef.make<Readonly<Record<string, unknown>>>({ first: "Anna", last: "Vos", city: "Rome", member: true })
@@ -73,9 +71,6 @@ it.live("draws a fieldset, a spacer and a container with a part, and keeps the v
     yield* settle
     expect(host.textContent).toContain("Who")
     expect(host.textContent).toContain("Family name")
-    expect(host.textContent).toContain("More")
-    // The part of the container is in the form.
-    expect(host.querySelector("p.inside")?.textContent).toBe("A part inside the form")
     const value = (name: string) => (made.form.getItem(name) as unknown as { getValue: () => unknown }).getValue()
     expect(value("first")).toBe("Anna")
     expect(value("last")).toBe("Vos")

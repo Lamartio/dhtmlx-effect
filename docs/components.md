@@ -5,7 +5,7 @@ Each product and widget on [dhtmlx.com/docs/products](https://dhtmlx.com/docs/pr
 - **Wrapped**: there is a part in `src/ui/`, with stories and tests.
 - **Listing**: there is no part yet. The book has an empty listing for it, from `src/todo/`. When the part is there, its stories go next to its code, and the file in `src/todo/` goes.
 
-Count: 35 components are wrapped, and 4 listings are empty. [What is left](#what-is-left) says why for each one.
+Count: 35 components are wrapped, and 3 listings are empty. [What is left](#what-is-left) says why for each one.
 
 ## Products
 
@@ -15,7 +15,7 @@ Count: 35 components are wrapped, and 4 listings are empty. [What is left](#what
 | Planning Engine | Headless core for resource planning and leveling. It has no UI | None found | | Nothing: there is no widget to wrap |
 | Scheduler | Calendar of events, as Outlook or Google Calendar | `dhtmlx-scheduler` | GPL-2.0 | Wrapped: `dhtmlx-effect/scheduler` |
 | Grid | Data grid. It is the Grid of the Suite, also sold alone | `dhx-suite`, `@dhtmlx/grid` | GPL-2.0 | Wrapped, in the Suite |
-| Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 21 wrapped, 2 listings |
+| Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 21 wrapped, 1 listing |
 | Diagram | Flowcharts, org charts, mind maps, PERT charts, and a live editor | `@dhtmlx/diagram` | GPL-2.0 | Wrapped: `dhtmlx-effect/diagram` |
 | Booking | Widget to book an appointment | `@dhtmlx/booking` | GPL-2.0 | Wrapped: `dhtmlx-effect/booking` |
 | Kanban | Board of cards in columns | `@dhtmlx/kanban` | GPL-2.0 | Wrapped: `dhtmlx-effect/kanban` |
@@ -66,7 +66,7 @@ One level deeper, from the docs of the Suite. A widget that is wrapped is not wr
 
 ### The controls of the Form
 
-The Form has 20 controls. `form` makes 15 of them from a field kind. The other 5 have one listing: Suite/Form controls.
+The Form has 20 controls. `form` makes 19 of them from a field kind. The Container is only in the PRO edition of the Suite.
 
 | Control | Here |
 |---|---|
@@ -85,8 +85,11 @@ The Form has 20 controls. `form` makes 15 of them from a field kind. The other 5
 | Toggle | The kind `toggle`: a boolean |
 | ToggleGroup | The kind `toggles`: the chosen options, as an array |
 | Text | The kind `note`: a value that the user cannot change |
-| Avatar, SimpleVault | Not yet: they hold files |
-| Container, Fieldset, Spacer | Not yet: they shape the layout |
+| Avatar | The kind `avatar`: one picture, as a link or a picked file |
+| SimpleVault | The kind `files`: a list of picked files. The form sends nothing |
+| Fieldset | The kind `fieldset`: a box around its `fields`. Their values stay in the flat record of the form |
+| Spacer | The kind `spacer`: empty room |
+| Container | Not in the free Suite: the Form makes it only in the PRO edition |
 
 ### The types of the Chart
 
@@ -98,7 +101,9 @@ Message, alert, confirm and tooltip. All four are in `Dialogs` and `tooltipOn`.
 
 ### The Grid
 
-`grid` has columns, a sort and the selected row. The Grid has more, with no part here yet: the editing of cells, filters in the header, range and block selection, the clipboard, the drag panel and the history. The TreeGrid mode is only in the PRO edition.
+`grid` has columns, a sort and the selected row both ways. A column can be `editable` (with an `editor` and `options`), `resizable`, and can have a `filter` in its header and a `type`. An edit of the user comes in the stream `edits`: the app writes it into the store, as the store is the truth.
+
+Not in the free Suite: range and block selection, the clipboard, the history, the drag panel and the TreeGrid mode. The Grid of the free Suite does not make them, also when the config asks for them; a test here checks that.
 
 ### Themes
 
@@ -138,9 +143,10 @@ Each one is a part with an entry of its own. The theme follows `Browser.dark` in
 | Listing | Why it is empty |
 |---|---|
 | Suite/Pagination | It is not in the free packages of the Suite |
-| Suite/Form controls | Five controls of the Form: Avatar and SimpleVault hold files, and Container, Fieldset and Spacer shape the layout. The fields of `form` are a flat list of values |
 | Event Calendar | No public npm package found |
 | Chatbot | No public npm package found |
+
+Only in the PRO edition, so with no part and no listing: the Container control of the Form, and of the Grid the range and block selection, the clipboard, the history, the drag panel and the TreeGrid mode.
 
 ## Notes for the wrapping
 

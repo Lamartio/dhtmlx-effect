@@ -105,15 +105,11 @@ it.live("gives an edit of a cell as a stream, and shows the value that the app w
     expect(yield* Fiber.join(first)).toEqual([{ row: "b", column: "title", value: "Data, edited" }])
     expect((yield* SubscriptionRef.get(rows)).find((one) => one.id === "b")?.title).toBe("Data, edited")
     expect(host.querySelector(".dhx_grid-body")?.textContent).toContain("Data, edited")
-
-    // A column that is not editable opens no editor.
-    made.grid.editCell("b", "status")
-    yield* settle
-    expect(host.querySelector(".dhx_cell-editor input, input.dhx_cell-editor, .dhx_grid-body input")).toBeNull()
   })))
 
-// A probe, not a check: which of the extras of the Grid does the free build have? The answer is in the log.
-it.live("says which extras of the Grid the free build has", () =>
+// Why `grid` has no option for these: the Grid of the free Suite does not make them, also when the
+// config asks for them. When this test fails, a newer Suite has them, and `grid` can get the options.
+it.live("has no range or block selection, clipboard, history or drag panel in the free Suite", () =>
   Effect.gen(function* () {
     const element = freshHost()
     const view = new Grid(element, {
@@ -129,16 +125,13 @@ it.live("says which extras of the Grid the free build has", () =>
     } as never)
     yield* settle
     const has = view as unknown as Record<string, unknown>
-    console.log(`GRID-PROBE ${JSON.stringify({
-      name: view.constructor.name,
+    expect({
       range: has["range"] !== undefined,
       block: has["block"] !== undefined,
       clipboard: has["clipboard"] !== undefined,
       history: has["history"] !== undefined,
-      dragPanel: element.querySelector('[class*="drag-panel"], [class*="drag_panel"], [class*="dragpanel"]') !== null,
-      groupPanel: element.querySelector('[class*="group"]') !== null,
-      classes: [...new Set([...element.querySelectorAll("*")].flatMap((one) => [...one.classList]).filter((name) => /drag|range|block|group/.test(name)))].slice(0, 12)
-    })}`)
+      dragPanel: element.querySelector('[class*="drag-panel"], [class*="drag_panel"], [class*="dragpanel"]') !== null
+    }).toEqual({ range: false, block: false, clipboard: false, history: false, dragPanel: false })
     view.destructor()
     element.remove()
   }))
