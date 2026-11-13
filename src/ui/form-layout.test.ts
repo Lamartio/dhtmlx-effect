@@ -63,6 +63,13 @@ it("takes the fields of a fieldset out of the top of the form, with their kind a
   expect(shape[2]?.fields?.map((field) => [field.name, field.kind, field.label])).toEqual([["first", "text", "First"], ["last", "text", "Family name"]])
 })
 
+it("puts a field that is named after a fieldset under that fieldset, and the fields with no name first", () => {
+  const shape = fieldsOf(Person, [...LAYOUT, { name: "city", label: "Town" }])
+  expect(shape.map((field) => [field.name, field.kind, field.label])).toEqual([
+    ["member", "checkbox", "Member"], ["who", "fieldset", "Who"], ["gap", "spacer", undefined], ["city", "text", "Town"]
+  ])
+})
+
 it.live("draws a fieldset and a spacer, and keeps the values of the fields in a fieldset", () =>
   run(Effect.gen(function* () {
     const host = yield* Host

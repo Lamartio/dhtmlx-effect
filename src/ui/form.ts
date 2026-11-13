@@ -85,7 +85,8 @@ const kindOf = (ast: Schema.Top["ast"]): { readonly kind: FieldKind; readonly op
 
 /**
  * The fields of a Struct Schema, in its order, with a kind from the type of each one. `fields`
- * changes a field by its name, such as a label or the kind `date`.
+ * changes a field by its name, such as a label or the kind `date`, and can add fields. When `fields`
+ * has a fieldset or a spacer, it also gives the order of the fields that it names.
  */
 export const fieldsOf = (schema: Schema.Top, fields: ReadonlyArray<Field> = []): ReadonlyArray<Field> => {
   const given = new Map(fields.map((field) => [field.name, field]))
@@ -108,10 +109,19 @@ export const fieldsOf = (schema: Schema.Top, fields: ReadonlyArray<Field> = []):
       })
     }
   }
-  const extras = fields.filter((field) => !fromSchema.has(field.name)).map((field) => (isLayout(field) ? inside(field) : { kind: "text" as const, label: field.name, ...field }))
+  const resolve = (field: Field): Field =>
+    isLayout(field) ? inside(field) : { kind: "text" as const, label: field.name, ...fromSchema.get(field.name), ...field }
+  // With a fieldset or a spacer, `fields` is also the order: first the fields of the Schema that it
+  // does not name, then its fields as they are given.
+  if (fields.some(isLayout)) {
+    const placed = fields.map(resolve)
+    const rest: Array<Field> = []
+    for (const [name, field] of fromSchema) if (!claimed.has(name) && !given.has(name)) rest.push(field)
+    return [...rest, ...placed]
+  }
   const out: Array<Field> = []
-  for (const [name, field] of fromSchema) if (!claimed.has(name)) out.push({ ...field, ...given.get(name) })
-  return [...out, ...extras]
+  for (const [name, field] of fromSchema) out.push({ ...field, ...given.get(name) })
+  return [...out, ...fields.filter((field) => !fromSchema.has(field.name)).map(resolve)]
 }
 
 type Values = Readonly<Record<string, unknown>>
