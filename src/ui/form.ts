@@ -173,6 +173,7 @@ type Item = {
   readonly setProperties: (props: Record<string, unknown>) => void
   readonly validate?: (silent?: boolean) => boolean
   readonly clearValidate?: () => void
+  readonly clear?: () => void
   readonly getValue: () => unknown
 }
 
@@ -282,7 +283,10 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
           if (one === undefined) continue
           const shown = fromControl(field, one.getValue())
           const wanted = isGroup(field) ? chosen(field, toControl(field, next[field.name])) : field.kind === "toggle" ? next[field.name] === true : next[field.name]
-          if (!same(shown, wanted)) view.setValue({ [field.name]: toControl(field, next[field.name]) })
+          if (same(shown, wanted)) continue
+          // A date takes no empty value: `clear` empties its input.
+          if (field.kind === "date" && wanted === undefined && one.clear !== undefined) one.clear()
+          else view.setValue({ [field.name]: toControl(field, next[field.name]) })
         }
       } finally {
         applying = false
