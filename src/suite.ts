@@ -1,11 +1,13 @@
 /** DHTMLX Suite (`dhx-suite`) on the tree: frames, data, forms, menus and messages. */
 export * from "./ui/button"
+export * from "./ui/chart"
 export * from "./ui/toolbar"
 export * from "./ui/layout"
 export * from "./ui/tabbar"
 export * from "./ui/sidebar"
 export * from "./ui/overlay"
 export * from "./ui/data"
+export * from "./ui/datepicker"
 export * from "./ui/form"
 export * from "./ui/inputs"
 export * from "./ui/menus"

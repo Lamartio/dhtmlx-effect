@@ -5,7 +5,7 @@ Each product and widget on [dhtmlx.com/docs/products](https://dhtmlx.com/docs/pr
 - **Wrapped**: there is a part in `src/ui/`, with stories and tests.
 - **Listing**: there is no part yet. The book has an empty listing for it, from `src/todo/`. When the part is there, its stories go next to its code, and the file in `src/todo/` goes.
 
-Count: 22 components are wrapped, and 17 listings are empty: 16 components, and the controls of the Form that are not there yet.
+Count: 24 components are wrapped, and 15 listings are empty: 14 components, and the controls of the Form that are not there yet.
 
 ## Products
 
@@ -15,7 +15,7 @@ Count: 22 components are wrapped, and 17 listings are empty: 16 components, and 
 | Planning Engine | Headless core for resource planning and leveling. It has no UI | None found | | Nothing: there is no widget to wrap |
 | Scheduler | Calendar of events, as Outlook or Google Calendar | `dhtmlx-scheduler` | GPL-2.0 | Wrapped: `dhtmlx-effect/scheduler` |
 | Grid | Data grid. It is the Grid of the Suite, also sold alone | `dhx-suite`, `@dhtmlx/grid` | GPL-2.0 | Wrapped, in the Suite |
-| Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 19 wrapped, 4 listings |
+| Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 21 wrapped, 2 listings |
 | Diagram | Flowcharts, org charts, mind maps, PERT charts, and a live editor | `@dhtmlx/diagram` | GPL-2.0 | 5 listings |
 | Booking | Widget to book an appointment | `@dhtmlx/booking` | GPL-2.0 | Listing |
 | Kanban | Board of cards in columns | `@dhtmlx/kanban` | GPL-2.0 | Wrapped: `dhtmlx-effect/kanban` |
@@ -34,18 +34,18 @@ Count: 22 components are wrapped, and 17 listings are empty: 16 components, and 
 | Widget | Here | Part | Stories |
 |---|---|---|---|
 | Calendar | Wrapped | `calendar` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
-| Chart | Listing | | Suite/Chart |
+| Chart | Wrapped | `chart` in `src/ui/chart.ts` | Suite/Chart |
 | ColorPicker | Wrapped | `colorpicker` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
 | ComboBox | Wrapped | `combobox` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
 | DataView | Wrapped | `dataView` in `src/ui/data.ts` | Suite/Data, DataView |
-| DatePicker | Listing. The Form has a date field, but there is no part alone | | Suite/DatePicker |
+| DatePicker | Wrapped: alone, and as the kind `date` of the Form | `datepicker` in `src/ui/datepicker.ts` | Suite/DatePicker |
 | Form | Wrapped, from an Effect Schema | `form` in `src/ui/form.ts` | Suite/Forms, Form from a Schema |
 | Grid | Wrapped | `grid` in `src/ui/data.ts` | Suite/Data, One store, Grid and List |
 | Layout | Wrapped | `layout` in `src/ui/layout.ts` | Suite/Frames, Layout |
 | List | Wrapped | `list` in `src/ui/data.ts` | Suite/Data, One store, Grid and List |
 | Menu | Wrapped | `menu` in `src/ui/menus.ts` | Suite/Menus and messages, Menu |
 | Message | Wrapped: message, alert, confirm and tooltip | `Dialogs` in `src/ui/dialogs.ts` | Suite/Menus and messages |
-| Pagination | Listing | | Suite/Pagination |
+| Pagination | Listing. It is not in the free packages: `dhx-suite` 9.3.2 and `@dhtmlx/suite` 9.4.2 have no Pagination | | Suite/Pagination |
 | Popup | Wrapped | `openPopup` in `src/ui/overlay.ts` | Suite/Frames, Popup |
 | Ribbon | Wrapped | `ribbon` in `src/ui/menus.ts` | Suite/Menus and messages, Ribbon |
 | Sidebar | Wrapped | `sidebar` in `src/ui/sidebar.ts` | Suite/Frames, Sidebar |
@@ -66,7 +66,7 @@ One level deeper, from the docs of the Suite. A widget that is wrapped is not wr
 
 ### The controls of the Form
 
-The Form has 20 controls. `form` makes 10 of them from a field kind. The other 10 have one listing: Suite/Form controls.
+The Form has 20 controls. `form` makes 15 of them from a field kind. The other 5 have one listing: Suite/Form controls.
 
 | Control | Here |
 |---|---|
@@ -80,11 +80,17 @@ The Form has 20 controls. `form` makes 10 of them from a field kind. The other 1
 | Slider | The kind `slider` |
 | ColorPicker | The kind `color` |
 | Button | Only the submit button |
-| Avatar, CheckboxGroup, Container, Fieldset, RadioGroup, SimpleVault, Spacer, Text, Toggle, ToggleGroup | Not yet |
+| RadioGroup | The kind `radio`: one option, as a string |
+| CheckboxGroup | The kind `checks`: the chosen options, as an array |
+| Toggle | The kind `toggle`: a boolean |
+| ToggleGroup | The kind `toggles`: the chosen options, as an array |
+| Text | The kind `note`: a value that the user cannot change |
+| Avatar, SimpleVault | Not yet: they hold files |
+| Container, Fieldset, Spacer | Not yet: they shape the layout |
 
 ### The types of the Chart
 
-13 types, all for the listing Suite/Chart: Line, Spline, Bar, X-Bar, Area, SplineArea, Pie, Pie 3D, Donut, Radar, Scatter, Treemap, and Calendar heatmap.
+13 types, all in `chart` through its `type`: Line, Spline, Bar, X-Bar, Area, SplineArea, Pie, Pie 3D, Donut, Radar, Scatter, Treemap, and Calendar heatmap.
 
 ### The kinds of the Message
 
