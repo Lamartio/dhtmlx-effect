@@ -20,7 +20,7 @@ Early: the API can change in each commit, and the package is not on npm yet. It 
 ```sh
 bun add github:Lamartio/dhtmlx-effect effect @effect/platform-browser
 # and the DHTMLX packages that you use:
-bun add dhx-suite dhtmlx-gantt dhtmlx-scheduler @dhtmlx/kanban
+bun add dhx-suite dhtmlx-gantt dhtmlx-scheduler @dhtmlx/kanban @dhtmlx/diagram
 ```
 
 The package ships TypeScript source, so use a bundler that reads TypeScript (Vite, Bun). Each DHTMLX package is an optional peer dependency: you install only what you import.
@@ -32,6 +32,7 @@ The package ships TypeScript source, so use a bundler that reads TypeScript (Vit
 | `dhtmlx-effect/gantt` | `dhtmlx-gantt` | Gantt |
 | `dhtmlx-effect/scheduler` | `dhtmlx-scheduler` | Scheduler |
 | `dhtmlx-effect/kanban` | `@dhtmlx/kanban` | Kanban |
+| `dhtmlx-effect/diagram` | `@dhtmlx/diagram` | Diagram (flowchart, org chart, mind map, PERT chart) and its editor |
 | `dhtmlx-effect/storybook` | `@storybook/html-vite` | Stories that are Effect trees, with the Browser layer in the toolbar |
 | `dhtmlx-effect/styles.css` | | The few styles of the wrappers. Load it after the CSS of DHTMLX |
 
@@ -140,11 +141,11 @@ A fiber of a widget that dies reports to the `Problems` service. `mount` shows t
 
 The code in this repository is under the [MIT licence](./LICENSE). It contains no DHTMLX code.
 
-DHTMLX has its own licences. On npm, the free Gantt (`dhtmlx-gantt` 10) is under MIT. The free editions of the Suite, the Scheduler and the Kanban are under GPL-2.0, so an app that ships them must follow the GPL too. For a closed app, buy a commercial licence from DHTMLX. This text is not legal advice: read the licence of each DHTMLX package that you use.
+DHTMLX has its own licences. On npm, the free Gantt (`dhtmlx-gantt` 10) is under MIT. The free editions of the Suite, the Scheduler, the Kanban and the Diagram are under GPL-2.0, so an app that ships them must follow the GPL too. For a closed app, buy a commercial licence from DHTMLX. This text is not legal advice: read the licence of each DHTMLX package that you use.
 
 ## Components
 
-[docs/components.md](./docs/components.md) lists each product and widget of DHTMLX, and what this repository has for it: 24 are wrapped, and 15 listings in the book are empty.
+[docs/components.md](./docs/components.md) lists each product and widget of DHTMLX, and what this repository has for it: 29 are wrapped, and 10 listings in the book are empty.
 
 ## Develop
 
