@@ -28,7 +28,7 @@ The package ships TypeScript source, so use a bundler that reads TypeScript (Vit
 | Import | Needs | Parts |
 |---|---|---|
 | `dhtmlx-effect` | `effect` | `Host`, `Browser`, `mount`, `resource`, `column`, `swap`, `keyed`, `slot`, `Problems` |
-| `dhtmlx-effect/suite` | `dhx-suite` | Button, Toolbar, Layout, Tabbar, Sidebar, Window, Popup, Grid, Tree, List, DataView, Form from a Schema, Calendar, Timepicker, Slider, Colorpicker, Combobox, file picker, Menu, Ribbon, ContextMenu, and confirm, alert, message and tooltip as Effects |
+| `dhtmlx-effect/suite` | `dhx-suite` | Button, Chart, Toolbar, Layout, Tabbar, Sidebar, Window, Popup, Grid, Tree, List, DataView, Form from a Schema, Calendar, Timepicker, Slider, Colorpicker, Combobox, file picker, Menu, Ribbon, ContextMenu, and confirm, alert, message and tooltip as Effects |
 | `dhtmlx-effect/gantt` | `dhtmlx-gantt` | Gantt |
 | `dhtmlx-effect/scheduler` | `dhtmlx-scheduler` | Scheduler |
 | `dhtmlx-effect/kanban` | `@dhtmlx/kanban` | Kanban |
@@ -144,7 +144,7 @@ DHTMLX has its own licences. On npm, the free Gantt (`dhtmlx-gantt` 10) is under
 
 ## Components
 
-[docs/components.md](./docs/components.md) lists each product and widget of DHTMLX, and what this repository has for it: 22 are wrapped, and 17 listings in the book are empty.
+[docs/components.md](./docs/components.md) lists each product and widget of DHTMLX, and what this repository has for it: 23 are wrapped, and 16 listings in the book are empty.
 
 ## Develop
 
