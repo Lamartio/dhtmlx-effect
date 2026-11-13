@@ -5,7 +5,7 @@ Each product and widget on [dhtmlx.com/docs/products](https://dhtmlx.com/docs/pr
 - **Wrapped**: there is a part in `src/ui/`, with stories and tests.
 - **Listing**: there is no part yet. The book has an empty listing for it, from `src/todo/`. When the part is there, its stories go next to its code, and the file in `src/todo/` goes.
 
-Count: 22 components are wrapped, and 16 have a listing.
+Count: 22 components are wrapped, and 17 listings are empty: 16 components, and the controls of the Form that are not there yet.
 
 ## Products
 
@@ -15,7 +15,7 @@ Count: 22 components are wrapped, and 16 have a listing.
 | Planning Engine | Headless core for resource planning and leveling. It has no UI | None found | | Nothing: there is no widget to wrap |
 | Scheduler | Calendar of events, as Outlook or Google Calendar | `dhtmlx-scheduler` | GPL-2.0 | Wrapped: `dhtmlx-effect/scheduler` |
 | Grid | Data grid. It is the Grid of the Suite, also sold alone | `dhx-suite`, `@dhtmlx/grid` | GPL-2.0 | Wrapped, in the Suite |
-| Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 19 wrapped, 3 listings |
+| Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 19 wrapped, 4 listings |
 | Diagram | Flowcharts, org charts, mind maps, PERT charts, and a live editor | `@dhtmlx/diagram` | GPL-2.0 | 5 listings |
 | Booking | Widget to book an appointment | `@dhtmlx/booking` | GPL-2.0 | Listing |
 | Kanban | Board of cards in columns | `@dhtmlx/kanban` | GPL-2.0 | Wrapped: `dhtmlx-effect/kanban` |
@@ -56,7 +56,51 @@ Count: 22 components are wrapped, and 16 have a listing.
 | Tree | Wrapped | `tree` in `src/ui/data.ts` | Suite/Data, Tree |
 | Window | Wrapped | `openWindow` in `src/ui/overlay.ts` | Suite/Frames, Window |
 
+The [page of the Suite](https://dhtmlx.com/docs/products/dhtmlxSuite/) has the same 22 widgets, in four groups: data (Chart, DataView, Grid, List, Tree), forms and editors (Calendar, ColorPicker, ComboBox, DatePicker, Form, Slider, TimePicker), layout and navigation (Layout, Menu, Pagination, Ribbon, Sidebar, Tabbar, Toolbar), and windows and popups (Message, Popup, Window). The [docs of the Suite](https://docs.dhtmlx.com/suite/) have 21 widgets: the DatePicker is there a control of the Form, an input with a Calendar.
+
 Parts here that the products page does not list as a widget: a Button (the CSS of the Suite on a plain button), a ContextMenu (`openContextMenu`, `gridContextMenu`), and a file picker (the part of the Uploader that picks files).
+
+## Inside the widgets of the Suite
+
+One level deeper, from the docs of the Suite. A widget that is wrapped is not wrapped in full.
+
+### The controls of the Form
+
+The Form has 20 controls. `form` makes 10 of them from a field kind. The other 10 have one listing: Suite/Form controls.
+
+| Control | Here |
+|---|---|
+| Input | The kinds `text` and `number` |
+| Textarea | The kind `textarea` |
+| Checkbox | The kind `checkbox` |
+| Select | The kind `select` |
+| Combo | The kind `combo` |
+| DatePicker (in the docs: Calendar) | The kind `date` |
+| TimePicker | The kind `time` |
+| Slider | The kind `slider` |
+| ColorPicker | The kind `color` |
+| Button | Only the submit button |
+| Avatar, CheckboxGroup, Container, Fieldset, RadioGroup, SimpleVault, Spacer, Text, Toggle, ToggleGroup | Not yet |
+
+### The types of the Chart
+
+13 types, all for the listing Suite/Chart: Line, Spline, Bar, X-Bar, Area, SplineArea, Pie, Pie 3D, Donut, Radar, Scatter, Treemap, and Calendar heatmap.
+
+### The kinds of the Message
+
+Message, alert, confirm and tooltip. All four are in `Dialogs` and `tooltipOn`.
+
+### The Grid
+
+`grid` has columns, a sort and the selected row. The Grid has more, with no part here yet: the editing of cells, filters in the header, range and block selection, the clipboard, the drag panel and the history. The TreeGrid mode is only in the PRO edition.
+
+### Themes
+
+The Suite has four themes: light, dark, and a contrast variant of each. The parts here set light or dark from `Browser.dark`. There is no fact for contrast yet.
+
+### Helpers
+
+Not widgets, but a part of the package: AJAX, AwaitRedraw (used here), CssManager, DataCollection and TreeCollection (used here), DataDrivers, DataProxy, dynamic loading, the Resizer, the Selection object and the Uploader (used here by the file picker).
 
 ## Diagram
 
