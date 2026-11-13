@@ -1,0 +1,62 @@
+{
+  "name": "dhtmlx-effect",
+  "version": "0.0.0",
+  "description": "Run DHTMLX widgets (Suite, Gantt, Scheduler, Kanban) as Effect programs: a scope for each widget, streams for events, nothing left behind.",
+  "license": "MIT",
+  "type": "module",
+  "repository": { "type": "git", "url": "git+https://github.com/Lamartio/dhtmlx-effect.git" },
+  "keywords": ["dhtmlx", "effect", "effect-ts", "gantt", "scheduler", "kanban", "grid"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./suite": "./src/suite.ts",
+    "./gantt": "./src/gantt.ts",
+    "./scheduler": "./src/scheduler.ts",
+    "./kanban": "./src/kanban.ts",
+    "./storybook": "./src/storybook.ts",
+    "./styles.css": "./src/styles.css",
+    "./storybook.css": "./src/storybook.css",
+    "./package.json": "./package.json"
+  },
+  "files": ["src", "!src/**/*.test.ts", "!src/**/*.stories.ts", "!src/examples"],
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "bun scripts/test.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "storybook": "storybook dev --port 6007 --host 127.0.0.1 --ci --disable-telemetry",
+    "book:build": "storybook build --quiet --disable-telemetry",
+    "size": "bun scripts/size.ts"
+  },
+  "peerDependencies": {
+    "@dhtmlx/kanban": "^1.7.3",
+    "@effect/platform-browser": "^4.1.2",
+    "@storybook/html-vite": "^10.0.0",
+    "dhtmlx-gantt": "^10.0.3",
+    "dhtmlx-scheduler": "^7.2.15",
+    "dhx-suite": "^9.3.2",
+    "effect": "^4.1.2"
+  },
+  "peerDependenciesMeta": {
+    "@dhtmlx/kanban": { "optional": true },
+    "@storybook/html-vite": { "optional": true },
+    "dhtmlx-gantt": { "optional": true },
+    "dhtmlx-scheduler": { "optional": true },
+    "dhx-suite": { "optional": true }
+  },
+  "devDependencies": {
+    "@dhtmlx/kanban": "1.7.3",
+    "@effect/platform-browser": "4.1.2",
+    "@effect/vitest": "4.1.2",
+    "@storybook/html-vite": "10.6.6",
+    "@types/bun": "^1.4.4",
+    "@vitest/browser-playwright": "5.1.0",
+    "dhtmlx-gantt": "10.0.3",
+    "dhtmlx-scheduler": "7.2.15",
+    "dhx-suite": "9.3.2",
+    "effect": "4.1.2",
+    "playwright": "1.65.0",
+    "storybook": "10.6.6",
+    "typescript": "^7.0.2",
+    "vite": "8.3.0",
+    "vitest": "5.1.0"
+  }
+}

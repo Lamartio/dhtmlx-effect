@@ -1,0 +1,102 @@
+/* The page of a story: the element around it, and the small parts that the stories use. */
+.dhxe-story {
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 16px;
+  background: var(--dhx-background-primary, #fff);
+  color: var(--dhx-font-color-primary, #222);
+  font-family: var(--dhx-font-family, system-ui, sans-serif);
+}
+
+.dhxe-facts {
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.dhxe-facts th,
+.dhxe-facts td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--dhx-border-color, #dfe0e1);
+  text-align: left;
+}
+
+.dhxe-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.dhxe-note {
+  margin: 8px 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.dhxe-log {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.dhxe-pane {
+  padding: 12px;
+}
+
+/* The rows and tiles of the List and DataView stories. */
+.dhxe-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 8px;
+  line-height: 36px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dhxe-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.dhxe-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--dhx-color-primary-light-active, #e3f0fb);
+  font-size: 11px;
+  line-height: 18px;
+  width: fit-content;
+}
+
+/* The form stories. */
+.dhxe-inputs {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.dhxe-input-box {
+  min-width: 250px;
+}
+
+.dhxe-input-box h4 {
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+
+.dhxe-drop-zone {
+  padding: 16px;
+  border: 2px dashed var(--dhx-border-color, #dfe0e1);
+  border-radius: 8px;
+}
+
+.dhxe-drop-zone .dhxe-drop {
+  border: 0;
+  padding: 0;
+}

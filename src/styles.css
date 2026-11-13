@@ -1,0 +1,103 @@
+/* The few styles of the wrappers. The rest is the CSS of DHTMLX. Load it after the CSS of DHTMLX. */
+
+/* A part of the tree stopped: red, at the top, never hidden. */
+.dhxe-error {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fde8e8;
+  color: #9b1c1c;
+  font-size: 13px;
+}
+
+.dhxe-error p {
+  margin: 0;
+}
+
+/* A place in a DHTMLX cell, window or popup, and the element of ours in it (slot.ts). */
+.dhxe-slot-place,
+.dhxe-slot {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.dhxe-slot {
+  position: relative;
+  overflow: auto;
+}
+
+.dhxe-popup .dhxe-slot-place,
+.dhxe-popup .dhxe-slot {
+  height: auto;
+  min-width: 240px;
+}
+
+/* The part of the open tab or sidebar item. */
+.dhxe-stage-pane {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+/* The Gantt, and its today line. */
+.dhxe-gantt {
+  border: 1px solid var(--dhx-gantt-base-colors-border, #dfe0e1);
+}
+
+.dhxe-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #e5484d;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.dhxe-today > span {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.dhxe-scheduler {
+  min-height: 480px;
+}
+
+.dhxe-kanban {
+  min-height: 480px;
+}
+
+/* The file picker. */
+.dhxe-drop {
+  padding: 16px;
+  border: 2px dashed var(--dhx-border-color, #dfe0e1);
+  border-radius: 8px;
+}
+
+/* The errors of the fields that DHTMLX shows no error line for (a slider, a time). */
+.dhxe-form-errors {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--dhx-color-danger, #e5484d);
+  font-size: 13px;
+}
+
+/* Messages of the Dialogs service. */
+.dhxe-message--success {
+  border-left: 4px solid var(--dhx-color-success, #0ab169);
+}
+
+.dhxe-message--danger {
+  border-left: 4px solid var(--dhx-color-danger, #e5484d);
+}
