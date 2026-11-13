@@ -1,4 +1,4 @@
-import { Booking, locales } from "@dhtmlx/booking"
+import { Booking, defaultCardShape, locales } from "@dhtmlx/booking"
 import { Effect, PubSub, Scope, Stream, SubscriptionRef } from "effect"
 import { Browser, follow } from "./browser"
 import { Host, resource } from "./host"
@@ -17,6 +17,8 @@ export type BookingCard = {
   readonly details?: string
   readonly preview?: string
   readonly price?: string
+  /** The stars (0 to 5) and the number of reviews. The cards show reviews only when each card has one. */
+  readonly review?: { readonly stars: number; readonly count: number }
   readonly slots?: ReadonlyArray<BookingRule>
   /** The starts of the slots that are taken, as timestamps. */
   readonly usedSlots?: ReadonlyArray<number>
@@ -36,9 +38,13 @@ export type BookingOptions = {
   readonly end?: Date
 }
 
+/** The parts of a card. The review part reads the review of each card, so it is off when a card has none. */
+const shape = (cards: ReadonlyArray<BookingCard>) => ({ ...defaultCardShape, review: cards.length > 0 && cards.every((card) => card.review !== undefined) })
+
 const copy = (cards: ReadonlyArray<BookingCard>) =>
   cards.map((card) => ({
     ...card,
+    ...(card.review === undefined ? {} : { review: { ...card.review } }),
     ...(card.slots === undefined ? {} : { slots: card.slots.map((rule) => ({ ...rule, ...(rule.days === undefined ? {} : { days: [...rule.days] }), ...(rule.dates === undefined ? {} : { dates: [...rule.dates] }) })) }),
     ...(card.usedSlots === undefined ? {} : { usedSlots: [...card.usedSlots] })
   }))
@@ -62,6 +68,7 @@ export const booking = (options: BookingOptions) =>
       () =>
         new Booking(host, {
           data: copy(first) as never,
+          cardShape: shape(first),
           start,
           ...(options.end === undefined ? {} : { end: options.end }),
           theme: wxTheme(dark),
@@ -83,7 +90,7 @@ export const booking = (options: BookingOptions) =>
     yield* follow(options.cards, (cards) => {
       if (cards === shown) return
       shown = cards
-      view.setConfig({ data: copy(cards) as never })
+      view.setConfig({ data: copy(cards) as never, cardShape: shape(cards) })
     }, "The Booking, while it followed its cards")
     let shownDark = dark
     yield* follow(browser.dark, (next) => {

@@ -57,7 +57,11 @@ export const vault = (options: VaultOptions = {}) =>
           toolbar: options.toolbar ?? true,
           uploader: { autosend: options.autosend ?? false, ...(options.target === undefined ? {} : { target: options.target }) }
         }),
-      (view) => view.destructor()
+      (view) => {
+        view.destructor()
+        // The destructor leaves the layout of the Vault in the host.
+        host.replaceChildren()
+      }
     )
     const mirror = yield* reportedCallback("The Vault, on a change of its files", () => {
       Effect.runSync(SubscriptionRef.set(files, (view.data.serialize() as ReadonlyArray<Record<string, unknown>>).map(fileOf)))

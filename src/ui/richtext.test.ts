@@ -1,6 +1,7 @@
 import { it } from "@effect/vitest"
 import { Effect, SubscriptionRef } from "effect"
 import { expect } from "vitest"
+import { text } from "@dhtmlx/richtext"
 import "@dhtmlx/richtext/dist/richtext.css"
 import { Browser, setFacts } from "./browser"
 import { alive, Host } from "./host"
@@ -12,15 +13,18 @@ it.live("shows the text of its value, follows a new value, and writes what the u
     const host = yield* Host
     const value = yield* SubscriptionRef.make("<p>Hello there</p>")
     const made = yield* richtext({ value })
+    // The words in the editor, with no marks.
+    const words = () => made.richtext.getValue(text.toText)
     yield* settle
-    expect(host.textContent).toContain("Hello there")
+    expect(words()).toContain("Hello there")
     // The editor only showed the value: nothing went back.
     expect(yield* SubscriptionRef.get(value)).toBe("<p>Hello there</p>")
 
     yield* SubscriptionRef.set(value, "<p>A new text</p>")
     yield* settle
-    expect(host.textContent).toContain("A new text")
-    expect(host.textContent).not.toContain("Hello there")
+    expect(words()).toContain("A new text")
+    expect(words()).not.toContain("Hello there")
+    expect(host.textContent).not.toBe("")
 
     // What typing does: the document of the editor changes.
     made.richtext.setValue("<p>Typed by a person</p>")
@@ -31,13 +35,13 @@ it.live("shows the text of its value, follows a new value, and writes what the u
 
 it.live("reads and writes Markdown when the format is markdown", () =>
   run(Effect.gen(function* () {
-    const host = yield* Host
     const value = yield* SubscriptionRef.make("# A title\n\nSome **bold** words.")
     const made = yield* richtext({ value, format: "markdown" })
     yield* settle
-    expect(host.textContent).toContain("A title")
-    expect(host.textContent).toContain("bold")
-    expect(host.textContent).not.toContain("**")
+    const words = made.richtext.getValue(text.toText)
+    expect(words).toContain("A title")
+    expect(words).toContain("bold")
+    expect(words).not.toContain("**")
 
     made.richtext.setValue("<h2>Second</h2><p>More text</p>")
     yield* settle
@@ -51,10 +55,11 @@ it.live("keeps its text when the theme of the Browser changes", () =>
     const host = yield* Host
     const browser = yield* Browser
     const value = yield* SubscriptionRef.make("<p>Stays here</p>")
-    yield* richtext({ value })
+    const made = yield* richtext({ value })
     yield* settle
     yield* setFacts(browser, { dark: true })
     yield* settle
-    expect(host.textContent).toContain("Stays here")
+    expect(made.richtext.getValue(text.toText)).toContain("Stays here")
+    expect(host.textContent).not.toBe("")
     expect(yield* SubscriptionRef.get(value)).toBe("<p>Stays here</p>")
   })))
