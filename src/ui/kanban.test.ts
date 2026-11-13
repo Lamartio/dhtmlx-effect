@@ -6,7 +6,7 @@ import "../styles.css"
 import "../storybook.css"
 import { Browser, browserWith, setFacts, type BrowserFacts } from "./browser"
 import { alive, Host, mount } from "./host"
-import { kanban, kanbanLanguage } from "./kanban"
+import { kanban, kanbanLanguage, kanbanToolbar } from "./kanban"
 
 const FACTS: BrowserFacts = {
   dark: false,
@@ -100,4 +100,45 @@ it.live("moves a card when the store changes, writes a move back into the store,
       expect(host.textContent).toContain("081 Theme")
     }).pipe(Effect.provideService(Host, host), Effect.provideService(Browser, facts)))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+  }))
+
+it.live("keeps the lane of a card and the store the same, shows the fields of a card, and removes its toolbar", () =>
+  Effect.gen(function* () {
+    const host = freshHost()
+    const bar = freshHost()
+    const facts = yield* browserWith(FACTS)
+    type Task = Issue & { readonly team: string }
+    yield* Effect.scoped(Effect.gen(function* () {
+      const rows = yield* SubscriptionRef.make<ReadonlyArray<Task>>(ISSUES.map((one) => ({ ...one, team: "app" })))
+      const { kanban: board } = yield* kanban({
+        rows,
+        field: "status",
+        columns: COLUMNS.map((one) => (one.id === "doing" ? { ...one, limit: 1, strictLimit: true } : one)),
+        lanes: { field: "team", rows: [{ id: "app", label: "The app" }, { id: "site", label: "The site" }] },
+        label: (row) => `${row.id} ${row.title}`,
+        fields: () => ({ users: ["ann"], progress: 40 }),
+        shape: { progress: true, users: { show: true, values: [{ id: "ann", label: "Ann Example" }] } }
+      })
+      yield* kanbanToolbar(board).pipe(Effect.provideService(Host, bar))
+      yield* settle
+      expect(host.textContent).toContain("The site")
+      expect(host.textContent).toContain("40%")
+      expect(bar.querySelector("input")).not.toBeNull()
+      expect((board.serialize().columns.find((one) => one.id === "doing"))?.limit).toBe(1)
+      // DOING is full (078), so the Kanban refuses 075: the store keeps its status.
+      yield* Effect.promise(() => board.api.exec("move-card", { id: "card:075", columnId: "doing", rowId: "app" }))
+      yield* settle
+      expect((yield* SubscriptionRef.get(rows)).find((one) => one.id === "075")?.status).toBe("done")
+      // A drag to the other lane, in the same column.
+      yield* Effect.promise(() => board.api.exec("move-card", { id: "card:007", columnId: "backlog", rowId: "site" }))
+      yield* settle
+      expect((yield* SubscriptionRef.get(rows)).find((one) => one.id === "007")).toMatchObject({ status: "backlog", team: "site" })
+      // The store moves 080 to the other lane.
+      yield* SubscriptionRef.update(rows, (all) => all.map((one) => (one.id === "080" ? { ...one, team: "site" } : one)))
+      yield* settle
+      expect((board.getCard("card:080") as unknown as Task).team).toBe("site")
+      expect((board.api.getAreaCards("todo", "site") ?? []).map((one) => one.id)).toEqual(["card:080"])
+    }).pipe(Effect.provideService(Host, host), Effect.provideService(Browser, facts)))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+    expect(bar.innerHTML).toBe("")
   }))

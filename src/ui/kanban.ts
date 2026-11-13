@@ -1,4 +1,4 @@
-import { Kanban, locales } from "@dhtmlx/kanban"
+import { Kanban, Toolbar, locales } from "@dhtmlx/kanban"
 import { Effect, Option, PubSub, Scope, Stream, SubscriptionRef } from "effect"
 import { diffRows, type Row } from "../core/rows"
 import { Browser, follow } from "./browser"
@@ -18,7 +18,27 @@ import { Host, resource } from "./host"
 const cardId = (id: string) => `card:${id}`
 const rowId = (id: string | number) => String(id).replace(/^card:/, "")
 
-export type KanbanColumn = { readonly id: string; readonly label: string }
+export type KanbanColumn = {
+  readonly id: string
+  readonly label: string
+  /** The most cards in the column. The header shows the count against it, and the column marks when it has more. */
+  readonly limit?: number
+  /** With a limit: the Kanban refuses a drag into a full column. */
+  readonly strictLimit?: boolean
+  /** The column starts folded. */
+  readonly collapsed?: boolean
+}
+
+/** A swimlane: a row across all the columns. */
+export type KanbanLane = { readonly id: string; readonly label: string; readonly collapsed?: boolean }
+
+type KanbanConfig = ConstructorParameters<typeof Kanban>[1]
+
+/** Which fields of a card show, with their values (the people, the priorities, the colours), as DHTMLX takes them in `cardShape`. */
+export type KanbanShape = Omit<NonNullable<KanbanConfig["cardShape"]>, "menu">
+
+/** The other fields of a card: `priority`, `color`, `progress`, `users`, `start_date`, `end_date`. */
+export type KanbanFields = Omit<KanbanConfig["cards"][number], "id" | "label" | "description">
 
 export type KanbanOptions<R extends Row> = {
   /** The rows, such as the issues of a tracker. Each one is a card. */
@@ -30,6 +50,11 @@ export type KanbanOptions<R extends Row> = {
   readonly label: (row: R) => string
   /** A second line on a card. */
   readonly description?: (row: R) => string | undefined
+  /** Swimlanes: the field of a row that says its lane, such as `team`. A drag to another lane changes it. */
+  readonly lanes?: { readonly field: keyof R & string; readonly rows: ReadonlyArray<KanbanLane> }
+  /** More fields on a card. A field shows only when `shape` turns it on. */
+  readonly fields?: (row: R) => KanbanFields
+  readonly shape?: KanbanShape
 }
 
 /** The language of the Kanban for a BCP 47 tag; English when it has none. */
@@ -50,20 +75,29 @@ export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
     const host = yield* Host
     const browser = yield* Browser
     const opened = yield* Effect.acquireRelease(PubSub.unbounded<string>(), PubSub.shutdown)
-    const card = (row: R): Readonly<Record<string, string>> => {
+    const lane = options.lanes?.field
+    const card = (row: R): Readonly<Record<string, unknown>> => {
       const description = options.description?.(row)
-      return { id: cardId(row.id), label: options.label(row), [options.field]: String(row[options.field]), ...(description === undefined ? {} : { description }) }
+      return {
+        ...options.fields?.(row),
+        id: cardId(row.id),
+        label: options.label(row),
+        [options.field]: String(row[options.field]),
+        ...(lane === undefined ? {} : { [lane]: String(row[lane]) }),
+        ...(description === undefined ? {} : { description })
+      }
     }
     host.classList.add("dhxe-kanban")
     const board = yield* resource(
       "kanban",
       () =>
         new Kanban(host, {
-          columns: options.columns.map((column) => ({ id: column.id, label: column.label })),
+          columns: options.columns.map((column) => ({ ...column })),
           cards: [],
           columnKey: options.field,
+          ...(options.lanes === undefined ? {} : { rows: options.lanes.rows.map((row) => ({ ...row })), rowKey: options.lanes.field, rowShape: { menu: { show: false } } }),
           readonly: { edit: false, add: false, select: true, dnd: true },
-          cardShape: { label: true, description: true, menu: { show: false } },
+          cardShape: { label: true, description: true, ...options.shape, menu: { show: false } },
           columnShape: { menu: { show: false } } as never,
           history: false
         }),
@@ -92,7 +126,8 @@ export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
               const id = cardId(op.row.id)
               const shown = board.api.getCard(id) as Record<string, unknown> | undefined
               const next = card(op.row)
-              if (shown !== undefined && shown[options.field] !== next[options.field]) void board.api.exec("move-card", { id, columnId: next[options.field] })
+              if (shown !== undefined && (shown[options.field] !== next[options.field] || (lane !== undefined && shown[lane] !== next[lane])))
+                void board.api.exec("move-card", { id, columnId: next[options.field], ...(lane === undefined ? {} : { rowId: next[lane] }) })
               void board.api.exec("update-card", { id, card: next })
             }
           }
@@ -101,13 +136,17 @@ export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
       Effect.forkScoped
     )
 
-    // From the Kanban to the store: a drag to another column changes the field of that row.
-    board.api.on("move-card", ({ id, columnId }: { id: string | number; columnId?: string | number }) => {
-      if (columnId === undefined || columnId === null) return
+    // From the Kanban to the store: a drag to another column or lane changes that field of the row.
+    // The place comes from the card after the move, not from the event: the Kanban refuses a move into a
+    // full column with `strictLimit`, and the event comes all the same.
+    board.api.on("move-card", ({ id }: { id: string | number }) => {
       const key = rowId(id)
       const row = Effect.runSync(SubscriptionRef.get(options.rows)).find((one) => one.id === key)
-      if (row === undefined || String(row[options.field]) === String(columnId)) return
-      Effect.runFork(SubscriptionRef.update(options.rows, (all) => all.map((one) => (one.id === key ? { ...one, [options.field]: String(columnId) } : one))))
+      const shown = board.api.getCard(id) as Record<string, unknown> | undefined
+      if (row === undefined || shown === undefined) return
+      const moved = { [options.field]: String(shown[options.field]), ...(lane === undefined ? {} : { [lane]: String(shown[lane]) }) }
+      if (Object.entries(moved).every(([field, value]) => String(row[field as keyof R]) === value)) return
+      Effect.runFork(SubscriptionRef.update(options.rows, (all) => all.map((one) => (one.id === key ? { ...one, ...moved } : one))))
     })
     board.api.on("select-card", ({ id }: { id: string | number }) => {
       Effect.runSync(PubSub.publish(opened, rowId(id)))
@@ -118,3 +157,26 @@ export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
     yield* follow(browser.locale, (tag) => board.setLocale(locales[kanbanLanguage(tag)]))
     return { kanban: board, opened: Stream.fromPubSub(opened) }
   }) as Effect.Effect<{ readonly kanban: Kanban; readonly opened: Stream.Stream<string> }, never, Host | Browser | Scope.Scope>
+
+/**
+ * The toolbar of a Kanban in the host: a search box and a sort menu over the cards of `board`. It only
+ * filters and orders what the board shows; the store does not change. The theme and the language follow `Browser`.
+ */
+export const kanbanToolbar = (board: Kanban, items: ReadonlyArray<"search" | "sort" | "spacer"> = ["search", "spacer", "sort"]) =>
+  Effect.gen(function* () {
+    const host = yield* Host
+    const browser = yield* Browser
+    const bar = yield* resource(
+      "kanban-toolbar",
+      () => new Toolbar(host, { api: board.api, items: [...items], theme: "willow" }),
+      (bar) => {
+        bar.destructor()
+        host.replaceChildren()
+        for (const name of [...host.classList]) if (/^wx-.*-theme$/.test(name)) host.classList.remove(name)
+      }
+    )
+    // Each of these makes the toolbar again inside (`_init`), as the Kanban does.
+    yield* follow(browser.dark, (dark) => bar.setConfig({ theme: dark ? "willow-dark" : "willow" }))
+    yield* follow(browser.locale, (tag) => bar.setLocale(locales[kanbanLanguage(tag)]))
+    return bar
+  }) as Effect.Effect<Toolbar, never, Host | Browser | Scope.Scope>
