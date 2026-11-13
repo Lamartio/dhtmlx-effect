@@ -35,28 +35,34 @@ export const richtext = (options: RichtextOptions) =>
     const encoder = encoders(options.format ?? "html")
     const dark = yield* SubscriptionRef.get(browser.dark)
     const language = wxLanguage(yield* SubscriptionRef.get(browser.locale))
+    const first = yield* SubscriptionRef.get(options.value)
+    // The text as the editor writes it back: it can differ from the text it got (other spaces, other tags).
+    const written = (value: string): string => encoder.to(encoder.from(value))
     const view = yield* resource(
       "richtext",
-      () => new Richtext(host, { toolbar: options.toolbar ?? true, menubar: options.menubar ?? false, theme: wxTheme(dark), locale: locales[language] }),
+      // The first text goes in with the config, as HTML: the editor starts in a later task, and a
+      // `setValue` before that is lost.
+      () => new Richtext(host, { value: html.toHTML(encoder.from(first)), toolbar: options.toolbar ?? true, menubar: options.menubar ?? false, theme: wxTheme(dark), locale: locales[language] }),
       (view) => {
         view.destructor()
         wxClear(host)
       }
     )
     const read = () => view.getValue(encoder.to)
-    // The text as the editor writes it now. A text that came from `value` is not sent back.
-    let known: string | undefined
+    // The text that the editor has, as it writes it. A text that came from `value` is not sent back,
+    // also when the editor tells about it in a later task.
+    let known: string = written(first)
     let applying = false
     const put = (value: string) => {
+      known = written(value)
       applying = true
       try {
         view.setValue(value, encoder.from)
       } finally {
         applying = false
       }
-      known = read()
     }
-    let given: string | undefined
+    let given: string = first
     yield* follow(options.value, (value) => {
       if (value === known || value === given) return
       given = value
@@ -71,20 +77,21 @@ export const richtext = (options: RichtextOptions) =>
       given = next
       Effect.runSync(SubscriptionRef.set(options.value, next))
     })
-    // The document of the editor, as a store: it calls back on each change.
+    // The editor tells about each change of the text, and its document is a store that calls back.
+    view.api.on("change" as never, onChange as never)
     view.api.getReactiveState().document.subscribe(onChange as never)
 
     // A new theme or language makes the editor again inside: the text of now goes back in.
     const again = (config: Parameters<Richtext["setConfig"]>[0]) => {
       const now = read()
+      known = written(now)
       applying = true
       try {
-        view.setConfig(config)
-        if (read() !== now) view.setValue(now, encoder.from)
+        // The text of now goes with the config, as the editor starts again from its config.
+        view.setConfig({ ...config, value: html.toHTML(encoder.from(now)) })
       } finally {
         applying = false
       }
-      known = read()
     }
     let shownDark = dark
     yield* follow(browser.dark, (next) => {
