@@ -5,7 +5,7 @@ Each product and widget on [dhtmlx.com/docs/products](https://dhtmlx.com/docs/pr
 - **Wrapped**: there is a part in `src/ui/`, with stories and tests.
 - **Listing**: there is no part yet. The book has an empty listing for it, from `src/todo/`. When the part is there, its stories go next to its code, and the file in `src/todo/` goes.
 
-Count: 29 components are wrapped, and 10 listings are empty: 9 components, and the controls of the Form that are not there yet.
+Count: 35 components are wrapped, and 4 listings are empty. [What is left](#what-is-left) says why for each one.
 
 ## Products
 
@@ -17,15 +17,15 @@ Count: 29 components are wrapped, and 10 listings are empty: 9 components, and t
 | Grid | Data grid. It is the Grid of the Suite, also sold alone | `dhx-suite`, `@dhtmlx/grid` | GPL-2.0 | Wrapped, in the Suite |
 | Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 21 wrapped, 2 listings |
 | Diagram | Flowcharts, org charts, mind maps, PERT charts, and a live editor | `@dhtmlx/diagram` | GPL-2.0 | Wrapped: `dhtmlx-effect/diagram` |
-| Booking | Widget to book an appointment | `@dhtmlx/booking` | GPL-2.0 | Listing |
+| Booking | Widget to book an appointment | `@dhtmlx/booking` | GPL-2.0 | Wrapped: `dhtmlx-effect/booking` |
 | Kanban | Board of cards in columns | `@dhtmlx/kanban` | GPL-2.0 | Wrapped: `dhtmlx-effect/kanban` |
-| To Do List | Checklists with subtasks | `@dhtmlx/todolist` | GPL-2.0 | Listing |
+| To Do List | Checklists with subtasks | `@dhtmlx/todolist` | GPL-2.0 | Wrapped: `dhtmlx-effect/todolist` |
 | Event Calendar | Light calendar of events with six views | None found | | Listing |
 | Chatbot | Chat widget for an AI agent | None found. DHTMLX says it is MIT | | Listing |
-| Spreadsheet | Editable spreadsheet with formulas | `@dhtmlx/spreadsheet` | GPL-2.0 | Listing |
-| Pivot | Pivot table | `@dhtmlx/pivot` | GPL-2.0 | Listing |
-| Vault | File uploader | `@dhtmlx/vault` | GPL-2.0 | Listing |
-| RichText | Rich text editor | `@dhtmlx/richtext` | GPL-2.0 | Listing |
+| Spreadsheet | Editable spreadsheet with formulas | `@dhtmlx/spreadsheet` | GPL-2.0 | Wrapped: `dhtmlx-effect/spreadsheet` |
+| Pivot | Pivot table | `@dhtmlx/pivot` | GPL-2.0 | Wrapped: `dhtmlx-effect/pivot` |
+| Vault | File uploader | `@dhtmlx/vault` | GPL-2.0 | Wrapped: `dhtmlx-effect/vault` |
+| RichText | Rich text editor | `@dhtmlx/richtext` | GPL-2.0 | Wrapped: `dhtmlx-effect/richtext` |
 
 "None found" means that a search of the public npm registry gave no package. The product can still have a trial or a commercial package.
 
@@ -119,6 +119,28 @@ One package, with four modes and an editor. `diagram` in `src/ui/diagram.ts` dra
 | Mind map | A core topic with branches |
 | PERT chart | Tasks in stages, with durations and dependencies |
 | Editor | A person draws and changes a diagram in the browser |
+
+## The products alone
+
+Each one is a part with an entry of its own. The theme follows `Browser.dark` in each one; the language follows `Browser.locale` in the RichText, the Booking and the Pivot, which come with English, German and Chinese.
+
+| Part | The store | What comes back |
+|---|---|---|
+| `richtext({ value, format })` | The text, as HTML, Markdown or plain text | The same store: what the user writes |
+| `todo({ data })` | The tasks, the projects and the people | The same store: a check, a new task, a new text, a move |
+| `booking({ cards })` | The cards with the rules for their slots | `confirmed`: a stream of booked slots. The widget sends nothing |
+| `pivot({ rows, fields, config })` | The rows, and the build of the table | The store of the build: what the user sets in the panel |
+| `spreadsheet({ data })` | The cells | The same store: each edit |
+| `vault({ target })` | None: the user adds the files | `files`: the list of now. `uploaded` and `failed`: streams |
+
+## What is left
+
+| Listing | Why it is empty |
+|---|---|
+| Suite/Pagination | It is not in the free packages of the Suite |
+| Suite/Form controls | Five controls of the Form: Avatar and SimpleVault hold files, and Container, Fieldset and Spacer shape the layout. The fields of `form` are a flat list of values |
+| Event Calendar | No public npm package found |
+| Chatbot | No public npm package found |
 
 ## Notes for the wrapping
 
