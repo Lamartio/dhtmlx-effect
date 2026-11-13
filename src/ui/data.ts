@@ -1,8 +1,8 @@
 import { DataCollection, DataView, Grid, List, setTheme, Tree, TreeCollection } from "dhx-suite"
-import { Effect, Option, Scope, Stream, SubscriptionRef } from "effect"
+import { Effect, Option, PubSub, Scope, Stream, SubscriptionRef } from "effect"
 import { diffRows, type Row, type RowOp } from "../core/rows"
 import { Browser, follow } from "./browser"
-import { reporting } from "./problems"
+import { reportedCallback, reporting } from "./problems"
 import { Host, resource } from "./host"
 
 /**
@@ -129,11 +129,32 @@ export type GridColumn = {
   /** Sorts on a click on the header. Default: true. */
   readonly sortable?: boolean
   readonly align?: "left" | "center" | "right"
+  /** What the values are. A `number` sorts as a number, and a `boolean` shows a checkbox. Default: `string`. */
+  readonly type?: "string" | "number" | "boolean" | "date"
+  /** The user can change the cells of this column: a double click opens the editor. Default: false. */
+  readonly editable?: boolean
+  /** The editor of a cell. Default: an input, or a checkbox for a `boolean`. */
+  readonly editor?: "input" | "select" | "combobox" | "checkbox" | "datePicker" | "textarea"
+  /** The choices of a `select` or a `combobox` editor, and of a `select` or `combo` filter that should not read them from the rows. */
+  readonly options?: ReadonlyArray<string>
+  /** A filter in the header, under the name of the column: a text input, or a list of the values. */
+  readonly filter?: "input" | "select" | "combo"
+  /** The user can drag the edge of the header to change the width. Default: false. */
+  readonly resizable?: boolean
 }
+
+/** A cell that the user changed: the id of the row, the id of the column, and the new value. */
+export type GridEdit = { readonly row: string; readonly column: string; readonly value: unknown }
+
+const FILTERS = { input: "inputFilter", select: "selectFilter", combo: "comboFilter" } as const
 
 /**
  * A DHTMLX Grid on a collection: columns, a sort on a click on a header, and the selected row both
  * ways. The Grid draws only the rows in view, so 10,000 rows stay fast. The theme follows `Browser.dark`.
+ *
+ * A column can have a filter in its header, and its cells can be editable. An edit of the user
+ * comes in `edits`: the store is the truth, so the app writes the new value into the store, and the
+ * collection follows it. `forEachReported` with `edits` does that in one line.
  */
 export const grid = (options: { readonly data: DataCollection; readonly columns: ReadonlyArray<GridColumn> } & Selected) =>
   Effect.gen(function* () {
@@ -146,11 +167,16 @@ export const grid = (options: { readonly data: DataCollection; readonly columns:
           data: options.data as never,
           columns: options.columns.map((column) => ({
             id: column.id,
-            header: [{ text: column.header }],
+            header: [{ text: column.header }, ...(column.filter === undefined ? [] : [{ content: FILTERS[column.filter] }])],
             ...(column.width === undefined ? {} : { width: column.width }),
             ...(column.align === undefined ? {} : { align: column.align }),
+            ...(column.type === undefined ? {} : { type: column.type }),
+            ...(column.editable === true ? { editable: true } : {}),
+            ...(column.editor === undefined ? {} : { editorType: column.editor }),
+            ...(column.options === undefined ? {} : { options: [...column.options] }),
+            ...(column.resizable === true ? { resizable: true } : {}),
             sortable: column.sortable ?? true
-          })),
+          })) as never,
           selection: "row",
           autoWidth: true,
           keyNavigation: true,
@@ -159,6 +185,15 @@ export const grid = (options: { readonly data: DataCollection; readonly columns:
       (view) => view.destructor()
     )
     yield* theme
+    const edits = yield* Effect.acquireRelease(PubSub.unbounded<GridEdit>(), PubSub.shutdown)
+    const onEdit = yield* reportedCallback("The Grid, on an edit of a cell", (value: unknown, row: { readonly id: string | number }, column: { readonly id: string | number }) => {
+      Effect.runSync(PubSub.publish(edits, { row: String(row.id), column: String(column.id), value }))
+    })
+    yield* resource(
+      "listener",
+      () => view.events.on("afterEditEnd" as never, onEdit as never),
+      () => view.events.detach("afterEditEnd" as never)
+    )
     let applying = false
     const set = (id: string | undefined) => {
       if (!applying && Effect.runSync(SubscriptionRef.get(selected)) !== id) Effect.runSync(SubscriptionRef.set(selected, id))
@@ -186,8 +221,12 @@ export const grid = (options: { readonly data: DataCollection; readonly columns:
         applying = false
       }
     })
-    return { grid: view, selected }
-  }) as Effect.Effect<{ readonly grid: Grid; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined> }, never, Host | Browser | Scope.Scope>
+    return { grid: view, selected, edits: Stream.fromPubSub(edits) }
+  }) as Effect.Effect<
+    { readonly grid: Grid; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>; readonly edits: Stream.Stream<GridEdit> },
+    never,
+    Host | Browser | Scope.Scope
+  >
 
 /**
  * A DHTMLX Tree on a tree collection: folders that open and close, and the selected item both ways.

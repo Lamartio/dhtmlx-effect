@@ -7,7 +7,7 @@ import { column, Host } from "./host"
 import { spreadsheet, type SpreadsheetData } from "./spreadsheet"
 
 /** The Spreadsheet. The cells are in a store: edit a cell, and the store follows. */
-const meta: Meta = { title: "Spreadsheet" }
+const meta: Meta = { title: "Products/Spreadsheet" }
 export default meta
 type Story = StoryObj
 

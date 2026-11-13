@@ -7,7 +7,7 @@ import { column, Host } from "./host"
 import { richtext } from "./richtext"
 
 /** The RichText editor. The text is in a store, as Markdown here: type in the editor, and the store follows. */
-const meta: Meta = { title: "RichText" }
+const meta: Meta = { title: "Products/RichText" }
 export default meta
 type Story = StoryObj
 

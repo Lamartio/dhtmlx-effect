@@ -14,10 +14,27 @@ import { calendarNames } from "./inputs"
  *   options: the CheckboxGroup and the ToggleGroup.
  * - `toggle` is a boolean: one Toggle button.
  * - `note` shows its value as text that the user cannot change: the Text control.
+ * - `avatar` is one picture, as an `AvatarValue`: the Avatar control.
+ * - `files` is a list of picked files, as `FormFile`s: the SimpleVault control.
+ *
+ * Two kinds have no value. They shape the form:
+ *
+ * - `fieldset` is a box with a label around its `fields`. The values of those fields stay in the
+ *   one flat record of the form.
+ * - `spacer` is empty room, with a `height`.
+ *
+ * The Container control of DHTMLX is not here: it is only in the PRO edition of the Suite.
  */
 export type FieldKind =
   | "text" | "textarea" | "number" | "checkbox" | "select" | "combo" | "date" | "time" | "slider" | "color"
-  | "radio" | "checks" | "toggle" | "toggles" | "note"
+  | "radio" | "checks" | "toggle" | "toggles" | "note" | "avatar" | "files"
+  | "fieldset" | "spacer"
+
+/** The picture of an `avatar` field: a link to it, or the file that the user picked. */
+export type AvatarValue = { readonly src?: string; readonly file?: File }
+
+/** One file of a `files` field. The form sends nothing: the app takes `file` and uploads it. */
+export type FormFile = { readonly id: string; readonly name: string; readonly size: number; readonly file?: File }
 
 export type Field = {
   readonly name: string
@@ -30,7 +47,23 @@ export type Field = {
   readonly max?: number
   readonly step?: number
   readonly placeholder?: string
+  /** The files that an `avatar` or a `files` field takes, as on an `<input type="file">`, such as `image/*`. */
+  readonly accept?: string
+  /** The fields in a `fieldset`. A field of the Schema that is named here leaves its place in the form. */
+  readonly fields?: ReadonlyArray<Field>
+  /** A `fieldset` puts its fields under each other (`rows`, the default) or next to each other (`cols`). */
+  readonly direction?: "rows" | "cols"
+  /** Pixels, for a `spacer`. */
+  readonly height?: number
 }
+
+/** The kinds that shape the form and hold no value. */
+const isLayout = (field: Field) => field.kind === "fieldset" || field.kind === "spacer"
+
+/** Each field with a value, also the ones in a fieldset. */
+const leaves = (fields: ReadonlyArray<Field>): ReadonlyArray<Field> =>
+  fields.flatMap((field) => (field.kind === "fieldset" ? leaves(field.fields ?? []) : isLayout(field) ? [] : [field]))
+
 
 /** A field kind from the Schema, for a field that names none: a text, a number, a checkbox, or a select of literals. */
 const kindOf = (ast: Schema.Top["ast"]): { readonly kind: FieldKind; readonly options?: ReadonlyArray<{ readonly value: string; readonly label: string }> } => {
@@ -52,18 +85,43 @@ const kindOf = (ast: Schema.Top["ast"]): { readonly kind: FieldKind; readonly op
 
 /**
  * The fields of a Struct Schema, in its order, with a kind from the type of each one. `fields`
- * changes a field by its name, such as a label or the kind `date`.
+ * changes a field by its name, such as a label or the kind `date`, and can add fields. When `fields`
+ * has a fieldset or a spacer, it also gives the order of the fields that it names.
  */
 export const fieldsOf = (schema: Schema.Top, fields: ReadonlyArray<Field> = []): ReadonlyArray<Field> => {
   const given = new Map(fields.map((field) => [field.name, field]))
   const ast = schema.ast as { readonly _tag: string; readonly propertySignatures?: ReadonlyArray<{ readonly name: PropertyKey; readonly type: Schema.Top["ast"] }> }
   const signatures = ast._tag === "Objects" ? ast.propertySignatures ?? [] : []
-  const out = signatures.map((signature) => {
+  const fromSchema = new Map<string, Field>(signatures.map((signature) => {
     const name = String(signature.name)
-    return { name, label: name[0]!.toUpperCase() + name.slice(1), ...kindOf(signature.type), ...given.get(name) }
-  })
-  for (const field of fields) if (!out.some((one) => one.name === field.name)) out.push({ kind: "text", label: field.name, ...field })
-  return out
+    return [name, { name, label: name[0]!.toUpperCase() + name.slice(1), ...kindOf(signature.type) }]
+  }))
+  // A field in a fieldset takes its kind and label from the Schema too, and leaves the top of the form.
+  const claimed = new Set<string>()
+  const inside = (field: Field): Field => {
+    if (field.kind !== "fieldset") return field
+    return {
+      ...field,
+      fields: (field.fields ?? []).map((one) => {
+        if (one.kind === "fieldset") return inside(one)
+        claimed.add(one.name)
+        return isLayout(one) ? one : { kind: "text" as const, label: one.name, ...fromSchema.get(one.name), ...one }
+      })
+    }
+  }
+  const resolve = (field: Field): Field =>
+    isLayout(field) ? inside(field) : { kind: "text" as const, label: field.name, ...fromSchema.get(field.name), ...field }
+  // With a fieldset or a spacer, `fields` is also the order: first the fields of the Schema that it
+  // does not name, then its fields as they are given.
+  if (fields.some(isLayout)) {
+    const placed = fields.map(resolve)
+    const rest: Array<Field> = []
+    for (const [name, field] of fromSchema) if (!claimed.has(name) && !given.has(name)) rest.push(field)
+    return [...rest, ...placed]
+  }
+  const out: Array<Field> = []
+  for (const [name, field] of fromSchema) out.push({ ...field, ...given.get(name) })
+  return [...out, ...fields.filter((field) => !fromSchema.has(field.name)).map(resolve)]
 }
 
 type Values = Readonly<Record<string, unknown>>
@@ -72,7 +130,7 @@ type Values = Readonly<Record<string, unknown>>
 const LINE_UNDER: ReadonlySet<FieldKind> = new Set(["text", "number", "textarea", "date"])
 
 /** The DHTMLX control for a field, for the locale of now. */
-const control = (field: Field, locale: ReturnType<typeof calendarLocale>) => {
+const control = (field: Field, locale: ReturnType<typeof calendarLocale>): unknown => {
   const base = { name: field.name, id: field.name, label: field.label ?? field.name, labelPosition: "top" as const, ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }) }
   switch (field.kind ?? "text") {
     case "text":
@@ -106,6 +164,14 @@ const control = (field: Field, locale: ReturnType<typeof calendarLocale>) => {
       return { name: field.name, id: field.name, type: "togglegroup", multiselection: true, options: (field.options ?? []).map((option) => ({ type: "toggle", id: option.value, text: option.label })) }
     case "note":
       return { ...base, type: "text" }
+    case "avatar":
+      return { ...base, type: "avatar", accept: field.accept ?? "image/*", autosend: false }
+    case "files":
+      return { ...base, type: "simplevault", autosend: false, ...(field.accept === undefined ? {} : { accept: field.accept }) }
+    case "spacer":
+      return { name: field.name, id: field.name, type: "spacer", height: field.height ?? 16 }
+    case "fieldset":
+      return { name: field.name, id: field.name, type: "fieldset", label: field.label ?? "", [field.direction ?? "rows"]: (field.fields ?? []).map((one): unknown => control(one, locale)) }
   }
 }
 
@@ -119,9 +185,39 @@ const chosen = (field: Field, raw: unknown): ReadonlyArray<string> => {
   return (field.options ?? []).map((option) => option.value).filter((value) => on[value] !== undefined && on[value] !== false && on[value] !== "")
 }
 
-/** Two values of a field are the same: by value for the arrays of a group. */
-const same = (a: unknown, b: unknown) =>
-  a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((one, index) => one === b[index]))
+/** The kinds whose value is whole in the item: the change event of the form gives only a part of it. */
+const readsItem = (field: Field) => isGroup(field) || field.kind === "toggle" || field.kind === "avatar" || field.kind === "files"
+
+const avatarOf = (raw: unknown): AvatarValue | undefined => {
+  if (typeof raw !== "object" || raw === null) return undefined
+  const one = raw as { readonly src?: unknown; readonly file?: unknown }
+  const src = typeof one.src === "string" && one.src !== "" ? one.src : undefined
+  const file = one.file instanceof File ? one.file : undefined
+  return src === undefined && file === undefined ? undefined : { ...(src === undefined ? {} : { src }), ...(file === undefined ? {} : { file }) }
+}
+
+const filesOf = (raw: unknown): ReadonlyArray<FormFile> =>
+  (Array.isArray(raw) ? raw : []).map((item: Record<string, unknown>) => {
+    const file = item["file"] instanceof File ? item["file"] : undefined
+    return { id: String(item["id"]), name: String(item["name"] ?? file?.name ?? ""), size: Number(item["size"] ?? file?.size ?? 0), ...(file === undefined ? {} : { file }) }
+  })
+
+/** Two values of a field are the same: by value for the arrays of a group, by id for files, by picture for an avatar. */
+const same = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((one, index) => {
+      const other = b[index] as unknown
+      return one === other || (typeof one === "object" && one !== null && typeof other === "object" && other !== null && (one as { id?: unknown }).id === (other as { id?: unknown }).id)
+    })
+  }
+  if (typeof a === "object" && a !== null && typeof b === "object" && b !== null && !Array.isArray(a) && !Array.isArray(b)) {
+    const one = a as AvatarValue
+    const other = b as AvatarValue
+    return one.src === other.src && one.file === other.file
+  }
+  return false
+}
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
@@ -141,6 +237,10 @@ const fromControl = (field: Field, raw: unknown): unknown => {
     case "checks":
     case "toggles":
       return chosen(field, raw)
+    case "avatar":
+      return avatarOf(raw)
+    case "files":
+      return filesOf(raw)
     case "date":
       return raw instanceof Date ? dateToDay(raw) : raw === "" || raw === undefined ? undefined : String(raw)
     case "time": {
@@ -163,6 +263,10 @@ const toControl = (field: Field, value: unknown): unknown => {
     return Object.fromEntries((field.options ?? []).map((option) => [option.value, on.has(option.value)]))
   }
   if (field.kind === "toggle") return value === true
+  if (field.kind === "avatar") return avatarOf(value) ?? {}
+  if (field.kind === "files") {
+    return (Array.isArray(value) ? (value as ReadonlyArray<FormFile>) : []).map((file) => ({ id: file.id, name: file.name, size: file.size, status: "queue", progress: 0, ...(file.file === undefined ? {} : { file: file.file }) }))
+  }
   if (value === undefined) return field.kind === "checkbox" ? false : ""
   if (field.kind === "date" && typeof value === "string") return dayToDate(value)
   return value
@@ -199,12 +303,14 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const fields = fieldsOf(options.schema, options.fields)
+    const shape = fieldsOf(options.schema, options.fields)
+    // The fields with a value. The rest of `shape` only places them.
+    const fields = leaves(shape)
     const values = options.values ?? (yield* SubscriptionRef.make<Values>({}))
     const checked = yield* SubscriptionRef.make<Checked<S["Type"]>>(check(options.schema, yield* SubscriptionRef.get(values)))
     const submits = yield* Effect.acquireRelease(PubSub.unbounded<S["Type"]>(), PubSub.shutdown)
     const locale = calendarLocale(yield* SubscriptionRef.get(browser.locale))
-    const rows: Array<unknown> = fields.map((field) => control(field, locale))
+    const rows: Array<unknown> = shape.map((field) => control(field, locale))
     if (options.submitLabel !== "") rows.push({ type: "button", name: "submit", id: "submit", text: options.submitLabel ?? "Save", size: "medium", view: "flat", color: "primary" })
     // The form, and under it a list of the errors that DHTMLX cannot show under their own field.
     const place = yield* child("dhxe-form-place")
@@ -256,7 +362,7 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
           if (applying || field === undefined) return
           touched.add(name)
           // A group and a toggle give the event the part that changed: the whole value is in the item.
-          const whole = isGroup(field) || field.kind === "toggle" ? item(name)?.getValue() : raw
+          const whole = readsItem(field) ? item(name)?.getValue() : raw
           const next = { ...Effect.runSync(SubscriptionRef.get(values)), [name]: fromControl(field, whole) }
           if (next[name] === undefined) delete next[name]
           Effect.runSync(SubscriptionRef.set(values, next))
@@ -282,7 +388,15 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
           const one = item(field.name)
           if (one === undefined) continue
           const shown = fromControl(field, one.getValue())
-          const wanted = isGroup(field) ? chosen(field, toControl(field, next[field.name])) : field.kind === "toggle" ? next[field.name] === true : next[field.name]
+          const wanted = isGroup(field)
+            ? chosen(field, toControl(field, next[field.name]))
+            : field.kind === "toggle"
+              ? next[field.name] === true
+              : field.kind === "files"
+                ? filesOf(toControl(field, next[field.name]))
+                : field.kind === "avatar"
+                  ? avatarOf(next[field.name])
+                  : next[field.name]
           if (same(shown, wanted)) continue
           // A date takes no empty value: `clear` empties its input.
           if (field.kind === "date" && wanted === undefined && one.clear !== undefined) one.clear()

@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/html-vite"
+import type { StoryObj } from "@storybook/html-vite"
 import { Effect, Schema, Stream, SubscriptionRef } from "effect"
 import { Color, Day, Time } from "../core/form"
 import { form } from "./form"
-import { Host } from "./host"
+import { Host, type Widget } from "./host"
 import { calendar, colorpicker, combobox, filePicker, slider, timepicker } from "./inputs"
 import { layout } from "./layout"
 import { element, inside, widgetStory } from "../storybook/story"
@@ -11,8 +11,6 @@ import { element, inside, widgetStory } from "../storybook/story"
  * The forms: a Form made from an Effect Schema, and its inputs alone. Change
  * Locale and Zone in the toolbar: the date format, the calendar and the clock follow.
  */
-const meta: Meta = { title: "Suite/Forms" }
-export default meta
 type Story = StoryObj
 
 const Issue = Schema.Struct({
@@ -114,35 +112,33 @@ export const Choices: Story = {
     }))
 }
 
-export const Inputs: Story = {
-  name: "Inputs alone",
+/** One input alone, with its value under it. The value is in a store: the input and the line follow it. */
+const alone = <A>(first: A, part: (value: SubscriptionRef.SubscriptionRef<A>) => Widget, show: (value: A) => string): Story => ({
   render: () =>
     widgetStory(Effect.gen(function* () {
-      const day = yield* SubscriptionRef.make<string | undefined>(undefined)
-      const time = yield* SubscriptionRef.make("09:30")
-      const points = yield* SubscriptionRef.make(5)
-      const color = yield* SubscriptionRef.make("#2e7dd1")
-      const status = yield* SubscriptionRef.make<string | undefined>("todo")
-      const row = yield* element("div", "dhxe-row dhxe-inputs")
-      const box = (title: string) =>
-        Effect.gen(function* () {
-          const one = yield* inside(row, element("div", "dhxe-input-box"))
-          yield* inside(one, element("h4", "", title))
-          return yield* inside(one, element("div"))
-        })
-      yield* inside(yield* box("Calendar"), calendar({ value: day }))
-      yield* inside(yield* box("Timepicker"), timepicker({ value: time }))
-      yield* inside(yield* box("Colorpicker"), colorpicker({ value: color }))
-      const side = yield* box("Slider and Combobox")
-      yield* inside(side, slider({ value: points, min: 0, max: 13, label: "Points" }))
-      yield* inside(side, combobox({ value: status, label: "Status", options: ["backlog", "todo", "doing", "done"].map((value) => ({ value, label: value })) }))
+      const host = yield* Host
+      host.classList.add("dhxe-pane")
+      const value = yield* SubscriptionRef.make(first)
+      const box = yield* element("div", "dhxe-input-box")
+      yield* inside(box, part(value))
       const out = yield* element("pre", "dhxe-log")
-      yield* Stream.zipLatestAll(SubscriptionRef.changes(day), SubscriptionRef.changes(time), SubscriptionRef.changes(points), SubscriptionRef.changes(color), SubscriptionRef.changes(status)).pipe(
-        Stream.runForEach(([d, t, p, c, s]) => Effect.sync(() => (out.textContent = `day ${d ?? "none"} · time ${t} · points ${p} · colour ${c} · status ${s ?? "none"}`))),
-        Effect.forkScoped
-      )
+      yield* SubscriptionRef.changes(value).pipe(Stream.runForEach((now) => Effect.sync(() => (out.textContent = `value: ${show(now)}`))), Effect.forkScoped)
     }))
-}
+})
+
+export const CalendarAlone = alone<string | undefined>(undefined, (value) => calendar({ value }), (day) => day ?? "none")
+
+export const TimepickerAlone = alone("09:30", (value) => timepicker({ value }), (time) => time)
+
+export const ColorpickerAlone = alone("#2e7dd1", (value) => colorpicker({ value }), (color) => color)
+
+export const SliderAlone = alone(5, (value) => slider({ value, min: 0, max: 13, label: "Points" }), (points) => String(points))
+
+export const ComboboxAlone = alone<string | undefined>(
+  "todo",
+  (value) => combobox({ value, label: "Status", options: ["backlog", "todo", "doing", "done"].map((one) => ({ value: one, label: one })) }),
+  (status) => status ?? "none"
+)
 
 export const FilePicker: Story = {
   name: "File picker",

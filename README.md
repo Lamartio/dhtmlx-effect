@@ -154,7 +154,7 @@ DHTMLX has its own licences. On npm, the free Gantt (`dhtmlx-gantt` 10) is under
 
 ## Components
 
-[docs/components.md](./docs/components.md) lists each product and widget of DHTMLX, and what this repository has for it: 35 are wrapped, and 4 listings in the book are empty.
+[docs/components.md](./docs/components.md) lists each product and widget of DHTMLX, and what this repository has for it: 35 are wrapped, and 3 listings in the book are empty.
 
 ## Develop
 

@@ -1,7 +1,7 @@
 import type { Meta } from "@storybook/html-vite"
 import { notWrapped } from "./listing"
 
-const meta: Meta = { title: "Chatbot" }
+const meta: Meta = { title: "Products/Chatbot" }
 export default meta
 
 export const NotWrappedYet = notWrapped({

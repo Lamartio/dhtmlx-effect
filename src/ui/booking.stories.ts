@@ -9,7 +9,7 @@ import { column } from "./host"
  * The Booking widget. It sends nothing: a booked slot comes as a value of a stream, and this story
  * takes that slot out of the card, as an app would after it saved the booking.
  */
-const meta: Meta = { title: "Booking" }
+const meta: Meta = { title: "Products/Booking" }
 export default meta
 type Story = StoryObj
 

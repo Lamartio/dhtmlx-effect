@@ -7,7 +7,7 @@ import { column } from "./host"
 import { pivot, type PivotConfig, type PivotField } from "./pivot"
 
 /** The Pivot table. The rows and the build of the table are in stores: change the build in the panel, and the store follows. */
-const meta: Meta = { title: "Pivot" }
+const meta: Meta = { title: "Products/Pivot" }
 export default meta
 type Story = StoryObj
 

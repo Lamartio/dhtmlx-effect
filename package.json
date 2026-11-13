@@ -41,7 +41,9 @@
     "!src/**/*.stories.ts",
     "!src/examples",
     "!src/todo",
-    "!src/ui/wx-test.ts"
+    "!src/ui/wx-test.ts",
+    "!src/book",
+    "!src/**/*.examples.ts"
   ],
   "scripts": {
     "typecheck": "tsc -p .",

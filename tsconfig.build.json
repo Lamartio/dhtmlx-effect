@@ -2,5 +2,5 @@
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": false, "declaration": true, "sourceMap": true, "outDir": "dist", "rootDir": "src", "types": [] },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.stories.ts", "src/examples", "src/todo", "src/ui/wx-test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/**/*.stories.ts", "src/examples", "src/todo", "src/book", "src/**/*.examples.ts", "src/ui/wx-test.ts"]
 }

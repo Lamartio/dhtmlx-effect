@@ -7,7 +7,7 @@ import { column } from "./host"
 import { todo, type TodoData } from "./todo"
 
 /** The To Do List. The tasks are in a store: check or change a task, and the store follows. */
-const meta: Meta = { title: "To Do List" }
+const meta: Meta = { title: "Products/To Do List" }
 export default meta
 type Story = StoryObj
 
