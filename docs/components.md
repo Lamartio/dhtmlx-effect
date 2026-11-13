@@ -33,28 +33,28 @@ Count: 35 components are wrapped, and 3 listings are empty. [What is left](#what
 
 | Widget | Here | Part | Stories |
 |---|---|---|---|
-| Calendar | Wrapped | `calendar` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
+| Calendar | Wrapped | `calendar` in `src/ui/inputs.ts` | Suite/Calendar |
 | Chart | Wrapped | `chart` in `src/ui/chart.ts` | Suite/Chart |
-| ColorPicker | Wrapped | `colorpicker` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
-| ComboBox | Wrapped | `combobox` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
-| DataView | Wrapped | `dataView` in `src/ui/data.ts` | Suite/Data, DataView |
+| ColorPicker | Wrapped | `colorpicker` in `src/ui/inputs.ts` | Suite/ColorPicker |
+| ComboBox | Wrapped | `combobox` in `src/ui/inputs.ts` | Suite/ComboBox |
+| DataView | Wrapped | `dataView` in `src/ui/data.ts` | Suite/DataView |
 | DatePicker | Wrapped: alone, and as the kind `date` of the Form | `datepicker` in `src/ui/datepicker.ts` | Suite/DatePicker |
-| Form | Wrapped, from an Effect Schema | `form` in `src/ui/form.ts` | Suite/Forms, Form from a Schema |
-| Grid | Wrapped | `grid` in `src/ui/data.ts` | Suite/Data, One store, Grid and List |
-| Layout | Wrapped | `layout` in `src/ui/layout.ts` | Suite/Frames, Layout |
-| List | Wrapped | `list` in `src/ui/data.ts` | Suite/Data, One store, Grid and List |
-| Menu | Wrapped | `menu` in `src/ui/menus.ts` | Suite/Menus and messages, Menu |
-| Message | Wrapped: message, alert, confirm and tooltip | `Dialogs` in `src/ui/dialogs.ts` | Suite/Menus and messages |
-| Pagination | Listing. It is not in the free packages: `dhx-suite` 9.3.2 and `@dhtmlx/suite` 9.4.2 have no Pagination | | Suite/Pagination |
-| Popup | Wrapped | `openPopup` in `src/ui/overlay.ts` | Suite/Frames, Popup |
-| Ribbon | Wrapped | `ribbon` in `src/ui/menus.ts` | Suite/Menus and messages, Ribbon |
-| Sidebar | Wrapped | `sidebar` in `src/ui/sidebar.ts` | Suite/Frames, Sidebar |
-| Slider | Wrapped | `slider` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
-| Tabbar | Wrapped | `tabbar` in `src/ui/tabbar.ts` | Suite/Frames, Tabs |
-| TimePicker | Wrapped | `timepicker` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
+| Form | Wrapped, from an Effect Schema | `form` in `src/ui/form.ts` | Suite/Form |
+| Grid | Wrapped | `grid` in `src/ui/data.ts` | Suite/Grid |
+| Layout | Wrapped | `layout` in `src/ui/layout.ts` | Suite/Layout |
+| List | Wrapped | `list` in `src/ui/data.ts` | Suite/List |
+| Menu | Wrapped | `menu` in `src/ui/menus.ts` | Suite/Menu |
+| Message | Wrapped: message, alert, confirm and tooltip | `Dialogs` in `src/ui/dialogs.ts` | Suite/Message |
+| Pagination | Listing. It is not in the free packages: `dhx-suite` 9.3.2 and `@dhtmlx/suite` 9.4.2 have no Pagination |  | Suite/Pagination |
+| Popup | Wrapped | `openPopup` in `src/ui/overlay.ts` | Suite/Popup |
+| Ribbon | Wrapped | `ribbon` in `src/ui/menus.ts` | Suite/Ribbon |
+| Sidebar | Wrapped | `sidebar` in `src/ui/sidebar.ts` | Suite/Sidebar |
+| Slider | Wrapped | `slider` in `src/ui/inputs.ts` | Suite/Slider |
+| Tabbar | Wrapped | `tabbar` in `src/ui/tabbar.ts` | Suite/Tabbar |
+| TimePicker | Wrapped | `timepicker` in `src/ui/inputs.ts` | Suite/TimePicker |
 | Toolbar | Wrapped | `toolbar` in `src/ui/toolbar.ts` | Suite/Toolbar |
-| Tree | Wrapped | `tree` in `src/ui/data.ts` | Suite/Data, Tree |
-| Window | Wrapped | `openWindow` in `src/ui/overlay.ts` | Suite/Frames, Window |
+| Tree | Wrapped | `tree` in `src/ui/data.ts` | Suite/Tree |
+| Window | Wrapped | `openWindow` in `src/ui/overlay.ts` | Suite/Window |
 
 The [page of the Suite](https://dhtmlx.com/docs/products/dhtmlxSuite/) has the same 22 widgets, in four groups: data (Chart, DataView, Grid, List, Tree), forms and editors (Calendar, ColorPicker, ComboBox, DatePicker, Form, Slider, TimePicker), layout and navigation (Layout, Menu, Pagination, Ribbon, Sidebar, Tabbar, Toolbar), and windows and popups (Message, Popup, Window). The [docs of the Suite](https://docs.dhtmlx.com/suite/) have 21 widgets: the DatePicker is there a control of the Form, an input with a Calendar.
 
@@ -152,4 +152,4 @@ Only in the PRO edition, so with no part and no listing: the Container control o
 
 - **The Suite has a new package name.** This repository uses `dhx-suite` 9.3.2. Version 9.4.2 is on npm as `@dhtmlx/suite`, and some widgets also have a package alone: `@dhtmlx/grid`, `@dhtmlx/tree`, `@dhtmlx/calendar`, `@dhtmlx/chart`.
 - **Not each product has a free package.** Check the licence of a package before it becomes a dependency here.
-- **The stories are in groups today.** Suite/Frames, Suite/Data, Suite/Forms and Suite/Menus and messages each hold more than one widget.
+- **The book has one entry for each widget**, with the name that DHTMLX gives it, in `src/book/suite/`. The stories themselves are in `src/ui/*.examples.ts`, next to the parts: a story can be in more than one entry, such as the Grid and the List on one store.

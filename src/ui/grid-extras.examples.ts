@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/html-vite"
+import type { StoryObj } from "@storybook/html-vite"
 import { Effect, SubscriptionRef, Stream } from "effect"
 import { element, widgetStory } from "../storybook/story"
 import { dataCollection, grid } from "./data"
@@ -9,8 +9,6 @@ import { forEachReported } from "./problems"
  * A Grid that the user can edit and filter. An edit is a value of a stream: the story writes it into
  * the store, and the Grid follows the store.
  */
-const meta: Meta = { title: "Suite/Grid editing and filters" }
-export default meta
 type Story = StoryObj
 
 type Issue = { readonly id: string; readonly title: string; readonly status: string; readonly points: number; readonly urgent: boolean }

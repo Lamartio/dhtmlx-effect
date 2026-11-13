@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/html-vite"
+import type { StoryObj } from "@storybook/html-vite"
 import { Effect, Stream, SubscriptionRef } from "effect"
 import { button } from "./button"
 import { alive, column, Host, type Widget } from "./host"
@@ -15,8 +15,6 @@ import { toolbar, toolbarButton, toolbarSpacer, toolbarTitle } from "./toolbar"
  * The frames: Layout, Tabbar, Sidebar, Window and Popup. Each one holds parts
  * of the Effect tree; a part that leaves a frame closes its scope, so the counts go back.
  */
-const meta: Meta = { title: "Suite/Frames" }
-export default meta
 type Story = StoryObj
 
 /** A short text part, for a cell or a tab. */

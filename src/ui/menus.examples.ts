@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/html-vite"
+import type { StoryObj } from "@storybook/html-vite"
 import { Effect, Option, Stream, SubscriptionRef } from "effect"
 import { button } from "./button"
 import { dataCollection, grid } from "./data"
@@ -11,8 +11,6 @@ import { element, inside, widgetStory } from "../storybook/story"
  * The menus and messages: Menu, Ribbon, ContextMenu (also on the rows of a
  * Grid, with the mouse and the keyboard), and confirm, alert, message and tooltip as Effects.
  */
-const meta: Meta = { title: "Suite/Menus and messages" }
-export default meta
 type Story = StoryObj
 
 const say = (log: HTMLElement, line: string) => Effect.sync(() => (log.textContent = `${line}\n${log.textContent ?? ""}`.split("\n").slice(0, 10).join("\n")))

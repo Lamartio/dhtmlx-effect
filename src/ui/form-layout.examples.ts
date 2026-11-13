@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/html-vite"
+import type { StoryObj } from "@storybook/html-vite"
 import { Effect, Schema, Stream, SubscriptionRef } from "effect"
 import { element, widgetStory } from "../storybook/story"
 import { type AvatarValue, form, type FormFile } from "./form"
@@ -8,8 +8,6 @@ import { Host } from "./host"
  * The controls of the Form that shape it or hold files: a fieldset around fields, a spacer, a
  * picture and a list of files.
  */
-const meta: Meta = { title: "Suite/Form layout and files" }
-export default meta
 type Story = StoryObj
 
 const Member = Schema.Struct({
