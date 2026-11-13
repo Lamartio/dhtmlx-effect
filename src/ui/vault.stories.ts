@@ -9,7 +9,7 @@ import { vault } from "./vault"
  * The Vault. This story has no server, so it sends nothing: add files with the button or a drop, and
  * the list of files shows below as the code sees it.
  */
-const meta: Meta = { title: "Vault" }
+const meta: Meta = { title: "Products/Vault" }
 export default meta
 type Story = StoryObj
 

@@ -10,7 +10,7 @@ import { element, widgetStory } from "../storybook/story"
  * The Scheduler: a week of events. Change Locale, Zone and
  * Theme in the toolbar of Storybook: the Scheduler follows in place. A click on an event gives its id.
  */
-const meta: Meta = { title: "Scheduler" }
+const meta: Meta = { title: "Products/Scheduler" }
 export default meta
 type Story = StoryObj
 

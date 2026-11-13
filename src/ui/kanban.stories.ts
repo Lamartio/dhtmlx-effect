@@ -8,7 +8,7 @@ import { element, widgetStory } from "../storybook/story"
  * The Kanban: the issues of a tracker in four columns. Drag a card to another column: the status of
  * the issue in the store changes. Click a card: its id shows, where an app would open the issue.
  */
-const meta: Meta = { title: "Kanban" }
+const meta: Meta = { title: "Products/Kanban" }
 export default meta
 type Story = StoryObj
 
@@ -22,12 +22,12 @@ const BOARD: ReadonlyArray<Issue> = [
   { id: "067", title: "No silent deaths in a widget tree", status: "todo" },
   { id: "068", title: "Measure the bundle size of one Gantt", status: "todo" },
   { id: "058", title: "Share a page with a guest", status: "doing" },
-  { id: "080", title: "Kanban", status: "doing" },
+  { id: "080", title: "Products/Kanban", status: "doing" },
   { id: "075", title: "Frames", status: "done" },
   { id: "076", title: "Data", status: "done" },
   { id: "077", title: "Forms", status: "done" },
   { id: "078", title: "Menus and messages", status: "done" },
-  { id: "079", title: "Scheduler", status: "done" }
+  { id: "079", title: "Products/Scheduler", status: "done" }
 ]
 
 const COLUMNS = [

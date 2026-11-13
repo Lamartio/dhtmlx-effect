@@ -22,8 +22,8 @@ const issues = (): ReadonlyArray<Issue> => [
   { id: "076", title: "Suite/Data", status: "todo" },
   { id: "077", title: "Suite/Forms", status: "todo" },
   { id: "078", title: "Suite/Menus and messages", status: "todo" },
-  { id: "079", title: "Scheduler", status: "todo" },
-  { id: "080", title: "Kanban", status: "todo" }
+  { id: "079", title: "Products/Scheduler", status: "todo" },
+  { id: "080", title: "Products/Kanban", status: "todo" }
 ]
 
 const STATUSES = ["backlog", "todo", "doing", "done"] as const

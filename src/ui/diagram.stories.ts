@@ -10,7 +10,7 @@ import { column, Host } from "./host"
  * The Diagram: a flowchart, an org chart, a mind map and a PERT chart from one part, and the editor
  * where a person draws. The items are in a store: a change of an item shows in place.
  */
-const meta: Meta = { title: "Diagram" }
+const meta: Meta = { title: "Products/Diagram" }
 export default meta
 type Story = StoryObj
 

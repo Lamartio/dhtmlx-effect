@@ -11,7 +11,7 @@ import { widgetStory } from "../storybook/story"
  * grid columns from the Browser layer. Change them in the toolbar of Storybook, or make the frame
  * narrow with the viewport tool: the Gantt changes in place.
  */
-const meta: Meta = { title: "Gantt" }
+const meta: Meta = { title: "Products/Gantt" }
 export default meta
 type Story = StoryObj
 

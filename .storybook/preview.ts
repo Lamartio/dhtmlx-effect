@@ -23,8 +23,9 @@ const withSuiteTheme = (widget: Widget): Widget =>
 const preview: Preview = {
   ...browserGlobals,
   decorators: [browserDecorator({ around: withSuiteTheme })],
-  // The wrapped products first, then the listings of what has no wrapper yet (docs/components.md).
-  parameters: { layout: "fullscreen", options: { storySort: { method: "alphabetical", order: ["Core", "Suite", "Gantt", "Scheduler", "Kanban", "*"] } } }
+  // The tree itself, the Suite, then each product that stands alone. A listing of what has no wrapper
+  // yet (docs/components.md) is in the section of its product.
+  parameters: { layout: "fullscreen", options: { storySort: { method: "alphabetical", order: ["Core", "Suite", "Products", ["Gantt", "Scheduler", "Kanban", "*"], "*"] } } }
 }
 
 export default preview
