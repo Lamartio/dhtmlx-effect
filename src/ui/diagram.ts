@@ -196,13 +196,16 @@ export const diagramEditor = (options: DiagramEditorOptions) =>
       known = view.serialize() as unknown as ReadonlyArray<DiagramItem>
       Effect.runSync(SubscriptionRef.set(options.data, known))
     })
+    // The data events of the diagram inside the editor, and of the editor itself: they are not one
+    // event system in each version, and a second call with the same items changes nothing.
+    const systems = [...new Set([view.events, view.diagram.events] as ReadonlyArray<{ readonly on: (name: never, f: never) => void; readonly detach: (name: never) => void }>)]
     yield* resource(
       "listener",
       () => {
-        for (const name of ["change", "afteradd", "afterremove"]) view.events.on(name as never, onChange as never)
+        for (const events of systems) for (const name of ["change", "afteradd", "afterremove"]) events.on(name as never, onChange as never)
       },
       () => {
-        for (const name of ["change", "afteradd", "afterremove"]) view.events.detach(name as never)
+        for (const events of systems) for (const name of ["change", "afteradd", "afterremove"]) events.detach(name as never)
       }
     )
     yield* follow(browser.dark, (dark) => setTheme(dark ? "dark" : "light", host))
