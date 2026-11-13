@@ -5,7 +5,7 @@ Each product and widget on [dhtmlx.com/docs/products](https://dhtmlx.com/docs/pr
 - **Wrapped**: there is a part in `src/ui/`, with stories and tests.
 - **Listing**: there is no part yet. The book has an empty listing for it, from `src/todo/`. When the part is there, its stories go next to its code, and the file in `src/todo/` goes.
 
-Count: 23 components are wrapped, and 16 listings are empty: 15 components, and the controls of the Form that are not there yet.
+Count: 24 components are wrapped, and 15 listings are empty: 14 components, and the controls of the Form that are not there yet.
 
 ## Products
 
@@ -15,7 +15,7 @@ Count: 23 components are wrapped, and 16 listings are empty: 15 components, and 
 | Planning Engine | Headless core for resource planning and leveling. It has no UI | None found | | Nothing: there is no widget to wrap |
 | Scheduler | Calendar of events, as Outlook or Google Calendar | `dhtmlx-scheduler` | GPL-2.0 | Wrapped: `dhtmlx-effect/scheduler` |
 | Grid | Data grid. It is the Grid of the Suite, also sold alone | `dhx-suite`, `@dhtmlx/grid` | GPL-2.0 | Wrapped, in the Suite |
-| Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 20 wrapped, 3 listings |
+| Suite | UI library of 22 widgets, below | `dhx-suite`, `@dhtmlx/suite` | GPL-2.0 | 21 wrapped, 2 listings |
 | Diagram | Flowcharts, org charts, mind maps, PERT charts, and a live editor | `@dhtmlx/diagram` | GPL-2.0 | 5 listings |
 | Booking | Widget to book an appointment | `@dhtmlx/booking` | GPL-2.0 | Listing |
 | Kanban | Board of cards in columns | `@dhtmlx/kanban` | GPL-2.0 | Wrapped: `dhtmlx-effect/kanban` |
@@ -38,7 +38,7 @@ Count: 23 components are wrapped, and 16 listings are empty: 15 components, and 
 | ColorPicker | Wrapped | `colorpicker` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
 | ComboBox | Wrapped | `combobox` in `src/ui/inputs.ts` | Suite/Forms, Inputs alone |
 | DataView | Wrapped | `dataView` in `src/ui/data.ts` | Suite/Data, DataView |
-| DatePicker | Listing. The Form has a date field, but there is no part alone | | Suite/DatePicker |
+| DatePicker | Wrapped: alone, and as the kind `date` of the Form | `datepicker` in `src/ui/datepicker.ts` | Suite/DatePicker |
 | Form | Wrapped, from an Effect Schema | `form` in `src/ui/form.ts` | Suite/Forms, Form from a Schema |
 | Grid | Wrapped | `grid` in `src/ui/data.ts` | Suite/Data, One store, Grid and List |
 | Layout | Wrapped | `layout` in `src/ui/layout.ts` | Suite/Frames, Layout |
