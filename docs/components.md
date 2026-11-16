@@ -131,7 +131,7 @@ Each one is a part with an entry of its own. The theme follows `Browser.dark` in
 
 | Part | The store | What comes back |
 |---|---|---|
-| `richtext({ value, format })` | The text, as HTML, Markdown or plain text | The same store: what the user writes |
+| `richtext({ value, format, readOnly })` | The text, as HTML, Markdown or plain text. `readOnly` makes a reader, with no toolbar and no way to change the text | The same store: what the user writes |
 | `todo({ data })` | The tasks, the projects and the people | The same store: a check, a new task, a new text, a move |
 | `booking({ cards })` | The cards with the rules for their slots | `confirmed`: a stream of booked slots. The widget sends nothing |
 | `pivot({ rows, fields, config })` | The rows, and the build of the table | The store of the build: what the user sets in the panel |

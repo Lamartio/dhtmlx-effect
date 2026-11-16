@@ -1,6 +1,7 @@
 import { it } from "@effect/vitest"
 import { Effect, SubscriptionRef } from "effect"
 import { expect } from "vitest"
+import { userEvent } from "vitest/browser"
 import { text } from "@dhtmlx/richtext"
 import "@dhtmlx/richtext/dist/richtext.css"
 import { Browser, setFacts } from "./browser"
@@ -62,4 +63,37 @@ it.live("keeps its text when the theme of the Browser changes", () =>
     expect(made.richtext.getValue(text.toText)).toContain("Stays here")
     expect(host.textContent).not.toBe("")
     expect(yield* SubscriptionRef.get(value)).toBe("<p>Stays here</p>")
+  })))
+
+it.live("is a reader when it is read only: no toolbar, no typing, no edit actions, and a new value still shows", () =>
+  run(Effect.gen(function* () {
+    const host = yield* Host
+    const browser = yield* Browser
+    const value = yield* SubscriptionRef.make("<h2>A title</h2><p>Read me</p>")
+    const made = yield* richtext({ value, readOnly: true })
+    yield* settle
+    const area = () => host.querySelector<HTMLElement>("[contenteditable]")
+    expect(area()?.getAttribute("contenteditable")).toBe("false")
+    expect(host.querySelector(".wx-toolbar")).toBeNull()
+
+    yield* Effect.promise(() => userEvent.click(area()!))
+    yield* Effect.promise(() => userEvent.keyboard("Typed"))
+    yield* Effect.promise(() => made.richtext.api.exec("set-text-format", { bold: true }))
+    yield* Effect.promise(() => made.richtext.api.exec("insert-line", undefined))
+    yield* settle
+    const words = () => made.richtext.getValue(text.toText)
+    expect(words()).not.toContain("Typed")
+    expect(made.richtext.getValue()).not.toContain("<strong>")
+    expect(made.richtext.getValue()).not.toContain("<hr")
+    expect(yield* SubscriptionRef.get(value)).toBe("<h2>A title</h2><p>Read me</p>")
+
+    yield* SubscriptionRef.set(value, "<p>The next note</p>")
+    yield* settle
+    expect(words()).toContain("The next note")
+
+    // A new theme draws the text area again: it stays read only.
+    yield* setFacts(browser, { dark: true })
+    yield* settle
+    expect(area()?.getAttribute("contenteditable")).toBe("false")
+    expect(words()).toContain("The next note")
   })))

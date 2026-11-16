@@ -33,3 +33,24 @@ export const Markdown: Story = {
       yield* controls.set.clicks.pipe(Stream.runForEach(() => SubscriptionRef.set(value, `## Text ${++n}\n\nSet by the code.`)), Effect.forkScoped)
     }))
 }
+
+/** A reader: no toolbar, and no way to change the text. A new text from the code still shows. */
+export const ReadOnly: Story = {
+  render: () =>
+    widgetStory(Effect.gen(function* () {
+      const value = yield* SubscriptionRef.make("<h2>Read only</h2><p>Click in the text and type: nothing changes. You can still <a href=\"https://dhtmlx.com\">follow a link</a>, select and copy.</p><ul><li>One point</li><li>A second point</li></ul>")
+      const [controls] = yield* column([
+        Effect.gen(function* () {
+          const row = yield* element("div", "dhxe-row")
+          return { set: yield* inside(row, button({ label: "Show another text", color: "secondary" })) }
+        }),
+        Effect.gen(function* () {
+          const host = yield* Host
+          host.style.minHeight = "360px"
+          return yield* richtext({ value, readOnly: true })
+        })
+      ])
+      let n = 0
+      yield* controls.set.clicks.pipe(Stream.runForEach(() => SubscriptionRef.set(value, `<h2>Text ${++n}</h2><p>Set by the code, in a reader.</p>`)), Effect.forkScoped)
+    }))
+}

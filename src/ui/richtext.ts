@@ -20,7 +20,51 @@ export type RichtextOptions = {
   readonly toolbar?: boolean
   /** Default: false. */
   readonly menubar?: boolean
+  /**
+   * Default: false. True makes a reader: no toolbar and no menu bar (unless they are given), and the
+   * user cannot change the text. The text area takes no input, and the actions that change the text
+   * do nothing. A new `value` from the code still shows.
+   */
+  readonly readOnly?: boolean
 }
+
+/** The actions of the editor that change the text. Reading, copying, printing and an export stay. */
+const EDITS = [
+  "create-new", "undo", "redo", "cut", "paste", "set-text-style", "set-text-format", "clear-text-format",
+  "set-text-color", "set-font-size", "set-font-family", "align", "indent", "outdent", "set-line-height",
+  "subscript", "superscript", "insert-list", "toggle-list", "insert-link", "update-link", "delete-link",
+  "insert-image", "resize-image", "insert-line", "insert-token", "import"
+] as const
+
+/**
+ * Keeps the editor read only for the life of the scope. The editor draws its text area again after a
+ * new config, with `contenteditable` on: a watch on the host turns it off each time, and the actions
+ * of each new API are stopped too.
+ */
+const lockText = (host: HTMLElement, view: Richtext) =>
+  Effect.gen(function* () {
+    const locked = new WeakSet<object>()
+    const lock = () => {
+      for (const area of host.querySelectorAll<HTMLElement>("[contenteditable]")) {
+        if (area.getAttribute("contenteditable") === "false") continue
+        area.setAttribute("contenteditable", "false")
+        area.setAttribute("aria-readonly", "true")
+      }
+      if (locked.has(view.api)) return
+      locked.add(view.api)
+      for (const action of EDITS) view.api.intercept(action, () => false)
+    }
+    yield* resource(
+      "listener",
+      () => {
+        const watch = new MutationObserver(lock)
+        watch.observe(host, { subtree: true, childList: true, attributes: true, attributeFilter: ["contenteditable"] })
+        lock()
+        return watch
+      },
+      (watch) => watch.disconnect()
+    )
+  })
 
 /**
  * A DHTMLX RichText editor in the host. The text is in `value`, as HTML, Markdown or plain text:
@@ -33,6 +77,7 @@ export const richtext = (options: RichtextOptions) =>
     const host = yield* Host
     const browser = yield* Browser
     const encoder = encoders(options.format ?? "html")
+    const readOnly = options.readOnly ?? false
     const dark = yield* SubscriptionRef.get(browser.dark)
     const language = wxLanguage(yield* SubscriptionRef.get(browser.locale))
     const first = yield* SubscriptionRef.get(options.value)
@@ -42,12 +87,13 @@ export const richtext = (options: RichtextOptions) =>
       "richtext",
       // The first text goes in with the config, as HTML: the editor starts in a later task, and a
       // `setValue` before that is lost.
-      () => new Richtext(host, { value: html.toHTML(encoder.from(first)), toolbar: options.toolbar ?? true, menubar: options.menubar ?? false, theme: wxTheme(dark), locale: locales[language] }),
+      () => new Richtext(host, { value: html.toHTML(encoder.from(first)), toolbar: options.toolbar ?? !readOnly, menubar: options.menubar ?? false, theme: wxTheme(dark), locale: locales[language] }),
       (view) => {
         view.destructor()
         wxClear(host)
       }
     )
+    if (readOnly) yield* lockText(host, view)
     const read = () => view.getValue(encoder.to)
     // The text that the editor has, as it writes it. A text that came from `value` is not sent back,
     // also when the editor tells about it in a later task.
