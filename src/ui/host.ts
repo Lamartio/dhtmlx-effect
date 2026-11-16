@@ -186,9 +186,11 @@ export const mount = (tree: Widget, element: HTMLElement, browser: Layer.Layer<B
     connected(element).pipe(
       Effect.andThen(tree),
       Effect.provideService(Host, element),
-      Effect.provide(browser),
       Scope.provide(scope),
       Effect.andThen(Effect.never),
+      // The Browser lives as long as the tree: its listeners (the window size, the dark mode, the
+      // clock) go on after the tree has started, and stop when it is disposed.
+      Effect.provide(browser),
       // A tree that cannot start, or that fails, closes: half a widget is worse than a clear error.
       Effect.catchCause((cause) =>
         Cause.hasInterruptsOnly(cause)

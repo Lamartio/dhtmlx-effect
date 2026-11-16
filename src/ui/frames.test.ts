@@ -6,7 +6,7 @@ import "dhx-suite/codebase/suite.min.css"
 import "dhtmlx-gantt/codebase/dhtmlxgantt.css"
 import "../styles.css"
 import "../storybook.css"
-import { Browser, browserWith, setFacts, type BrowserFacts } from "./browser"
+import { Browser, browserWith, follow, layerBrowserLive, setFacts, type BrowserFacts } from "./browser"
 import { button } from "./button"
 import { gantt, type Task } from "./gantt"
 import { alive, Host, mount } from "./host"
@@ -219,4 +219,25 @@ it.live("shows a popup at its anchor, and ends it on a click outside", () =>
     yield* Fiber.join(fiber)
     expect(document.querySelector(".dhx_popup")).toBeNull()
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+  }))
+
+it.live("keeps the live Browser of a mounted tree, so a resize of the window still reaches the tree after its start", () =>
+  Effect.gen(function* () {
+    const host = freshHost()
+    const seen: Array<number> = []
+    const mounted = mount(
+      Effect.gen(function* () {
+        const browser = yield* Browser
+        yield* follow(browser.viewport, (viewport) => void seen.push(viewport.width))
+      }),
+      host,
+      layerBrowserLive
+    )
+    yield* settle
+    const before = seen.length
+    expect(before).toBeGreaterThan(0)
+    window.dispatchEvent(new Event("resize"))
+    yield* settle
+    expect(seen.length).toBeGreaterThan(before)
+    yield* Effect.promise(mounted.dispose)
   }))
