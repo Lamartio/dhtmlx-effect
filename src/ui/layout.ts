@@ -18,6 +18,8 @@ export type LayoutCell<A = unknown> = {
   readonly resizable?: boolean
   /** A button in the header that folds the cell. Needs a header. */
   readonly collapsable?: boolean
+  /** A class on the element of the cell, for a rule of the page, such as a cell that lies over the others on a phone. */
+  readonly css?: string
   /** True hides the cell, and the cells next to it take its place. A part outside the layout, such as a toolbar button, can fold a cell with it. */
   readonly hidden?: SubscriptionRef.SubscriptionRef<boolean>
 }
@@ -38,7 +40,8 @@ const config = (cell: LayoutCell): ICellConfig => ({
   ...(cell.width === undefined ? {} : { width: cell.width }),
   ...(cell.height === undefined ? {} : { height: cell.height }),
   ...(cell.resizable === undefined ? {} : { resizable: cell.resizable }),
-  ...(cell.collapsable === undefined ? {} : { collapsable: cell.collapsable })
+  ...(cell.collapsable === undefined ? {} : { collapsable: cell.collapsable }),
+  ...(cell.css === undefined ? {} : { css: cell.css })
 })
 
 /**

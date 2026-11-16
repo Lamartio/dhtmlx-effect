@@ -55,7 +55,7 @@ it.live("puts a toolbar and a Gantt in the cells of a layout, and leaves nothing
         direction: "rows",
         cells: [
           { id: "bar", height: 56, part: toolbar(toolbarTitle("In a cell")) },
-          { id: "chart", header: "Plan", part: gantt({ tasks }) }
+          { id: "chart", header: "Plan", css: "the-plan", part: gantt({ tasks }) }
         ]
       }),
       host,
@@ -63,6 +63,8 @@ it.live("puts a toolbar and a Gantt in the cells of a layout, and leaves nothing
     )
     yield* settle
     expect(host.querySelector(".dhx_layout")).not.toBeNull()
+    // The class of a cell is on the element of that cell.
+    expect(host.querySelector(".the-plan .gantt_container")).not.toBeNull()
     const cells = [...host.querySelectorAll<HTMLElement>(".dhx_layout-cell")]
     expect(cells.some((cell) => cell.querySelector(".dhxe-toolbar") !== null)).toBe(true)
     expect(cells.some((cell) => cell.querySelector(".gantt_container") !== null)).toBe(true)
