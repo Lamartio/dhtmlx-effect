@@ -225,3 +225,28 @@ it.live("opens the folders of expanded at the start once, with no loop between t
     expect(expands).toBe(before)
     expect(yield* SubscriptionRef.get(expanded)).toEqual(["board"])
   })))
+
+it.live("closes a Tree and its data with no draw after the end: a closed part throws nothing later", () =>
+  Effect.gen(function* () {
+    const thrown: Array<string> = []
+    const onError = (event: ErrorEvent) => {
+      thrown.push(event.message)
+      event.preventDefault()
+    }
+    window.addEventListener("error", onError)
+    yield* run(Effect.gen(function* () {
+      const rows = yield* SubscriptionRef.make<ReadonlyArray<{ id: string; value: string; parent?: string }>>([
+        { id: "a", value: "A" },
+        { id: "b", value: "B", parent: "a" }
+      ])
+      const data = yield* treeCollection(rows)
+      const made = yield* tree({ data, expanded: yield* SubscriptionRef.make<ReadonlyArray<string>>(["a"]) })
+      yield* settle
+      made.tree.selection.add("b")
+    }))
+    // A draw that DHTMLX put off runs in a later frame.
+    yield* settle
+    yield* Effect.promise(() => new Promise((done) => setTimeout(done, 50)))
+    window.removeEventListener("error", onError)
+    expect(thrown).toEqual([])
+  }))

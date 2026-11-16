@@ -4,6 +4,7 @@ import { diffRows, type Row, type RowOp } from "../core/rows"
 import { Browser, follow } from "./browser"
 import { reportedCallback, reporting } from "./problems"
 import { Host, resource } from "./host"
+import { resourceAfterPaint } from "./paint"
 
 /**
  * The bridge from an Effect store to the data of DHTMLX. One store drives one
@@ -160,7 +161,7 @@ export const grid = (options: { readonly data: DataCollection; readonly columns:
   Effect.gen(function* () {
     const host = yield* Host
     const selected = yield* selectedOr(options)
-    const view = yield* resource(
+    const view = yield* resourceAfterPaint(
       "grid",
       () =>
         new Grid(host, {
@@ -242,7 +243,7 @@ export const tree = (options: {
     const host = yield* Host
     const selected = yield* selectedOr(options)
     const expanded = options.expanded ?? (yield* SubscriptionRef.make<ReadonlyArray<string>>([]))
-    const view = yield* resource("tree", () => new Tree(host, { data: options.data as never, css: "dhxe-tree", ...(options.template === undefined ? {} : { template: options.template as never }) }), (view) => view.destructor())
+    const view = yield* resourceAfterPaint("tree", () => new Tree(host, { data: options.data as never, css: "dhxe-tree", ...(options.template === undefined ? {} : { template: options.template as never }) }), (view) => view.destructor())
     yield* theme
     yield* selectedRef(view.selection as unknown as Selection, selected)
     // A change from `expanded` opens folders, and DHTMLX tells of each one: that event must not go
@@ -302,7 +303,7 @@ export const list = (options: { readonly data: DataCollection; readonly template
   Effect.gen(function* () {
     const host = yield* Host
     const selected = yield* selectedOr(options)
-    const view = yield* resource(
+    const view = yield* resourceAfterPaint(
       "list",
       () =>
         new List(host, {
@@ -331,7 +332,7 @@ export const dataView = (options: { readonly data: DataCollection; readonly temp
     const browser = yield* Browser
     const selected = yield* selectedOr(options)
     const wide = options.itemsInRow ?? 4
-    const view = yield* resource(
+    const view = yield* resourceAfterPaint(
       "dataview",
       () =>
         new DataView(host, {
