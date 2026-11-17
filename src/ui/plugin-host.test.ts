@@ -11,7 +11,7 @@ import { kanbanModel } from "../model/kanban"
 import { connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
 import { column, gridNode, kanbanNode, publishTree, sliderNode, type UiNode } from "../model/tree"
 import { UiState, uiState } from "../model/ui-state"
-import { bindTree, Button, Column, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
+import { bindTree, Button, Column, Form, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
 import { Browser, browserWith } from "./browser"
 import { alive, Host } from "./host"
 import { renderPlugin } from "./plugin-host"
@@ -212,6 +212,43 @@ it.live("sends a click on a toolbar, a button and a menu of a plugin to the plug
       click(".dhx_menu-button, button", "About")
       yield* settle
       expect(log).toEqual(["bar.click(add)", "save.click(save)", "menu.click(about)"])
+    }))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+  }))
+
+it.live("draws a form of a plugin: a value goes to the plugin, and the error of the plugin shows under its field", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.width = "700px"
+    element.style.height = "500px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const ui = yield* uiState
+      yield* bindTree(Column.make({
+        id: "main",
+        children: [Form.make({ id: "issue", submitLabel: "Save", fields: [{ name: "title", label: "Title", kind: "text", required: true }, { name: "code", label: "Code", kind: "text", pattern: "^[A-Z]{3}$", message: "Three capitals" }] })]
+      })).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, pluginEnd)
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      yield* settle
+      const state = () => Effect.map(ui.full, (full) => (full.state as Record<string, { values: Record<string, unknown>; errors: Record<string, string> }>)["issue"]!)
+      // The user types a code, as in the page.
+      const code = element.querySelectorAll<HTMLInputElement>("input")[1]!
+      code.value = "abc"
+      code.dispatchEvent(new Event("input", { bubbles: true }))
+      code.dispatchEvent(new Event("change", { bubbles: true }))
+      code.dispatchEvent(new Event("blur", { bubbles: true }))
+      yield* settle
+      expect((yield* state()).values).toEqual({ code: "abc" })
+      expect(element.textContent).toContain("Three capitals")
+      // A send with no title: the plugin refuses it, and both errors show.
+      ;[...element.querySelectorAll<HTMLElement>("button")].find((one) => one.textContent?.includes("Save"))!.click()
+      yield* settle
+      expect((yield* state()).errors).toEqual({ title: "Fill this in", code: "Three capitals" })
+      expect(element.textContent).toContain("Fill this in")
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))

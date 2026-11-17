@@ -1,6 +1,7 @@
 import { Effect, PubSub, Ref, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
 import { CLICK_ACTIONS, type ClickModel } from "./clicks"
+import { FORM_ACTIONS, type FormModel } from "./form"
 import { type GanttModel, GANTT_ACTIONS, type Task, type Zoom } from "./gantt"
 import { GRID_ACTIONS, type GridModel, type GridSort } from "./grid"
 import { VALUE_ACTIONS, type ValueModel } from "./inputs"
@@ -194,3 +195,10 @@ export const remoteKanban = <R extends Row>(host: Host, id: string) =>
 /** The remote model of a Toolbar, a Button, a Menu or a Ribbon: only `click`, which goes to the plugin. */
 export const remoteClicks = (host: Host, id: string) =>
   Effect.map(remoteModel(host, id, {}, CLICK_ACTIONS), (model) => ({ ...model, clicked: Stream.empty }) as unknown as ClickModel)
+
+/** The remote model of a form: its values and the errors to show; `submit` takes no arguments. */
+export const remoteForm = (host: Host, id: string) =>
+  Effect.map(
+    remoteModel(host, id, { values: {} as Readonly<Record<string, unknown>>, errors: {} as Readonly<Record<string, string>> }, FORM_ACTIONS),
+    (model) => ({ ...noActionArgs(model as unknown as Record<string, unknown>, ["submit"]), submitted: Stream.empty }) as unknown as FormModel
+  )

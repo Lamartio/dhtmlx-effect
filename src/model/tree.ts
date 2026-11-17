@@ -1,5 +1,6 @@
 import { Effect, Schema, type Scope, Stream, SubscriptionRef } from "effect"
 import { CLICK_ACTIONS, type ClickModel, type MenuItem, MenuItemSchema, ToolbarItemSchema } from "./clicks"
+import { FieldSchema, FORM_ACTIONS, type FormModel } from "./form"
 import { GANTT_ACTIONS, type GanttModel } from "./gantt"
 import { GRID_ACTIONS, type GridColumn, type GridModel } from "./grid"
 import { VALUE_ACTIONS, type ValueModel, valueModel } from "./inputs"
@@ -63,6 +64,9 @@ export const WireNodes = {
     view: Schema.optional(Schema.Literals(["flat", "link"])),
     disabled: Schema.optional(Schema.Boolean)
   }),
+  /** A form from a plugin: its fields as data, with their rules (`required`, `pattern`, `min`, `max`). */
+  form: Schema.TaggedStruct("form", { id: Schema.String, size: Size, fields: Schema.Array(FieldSchema), submitLabel: Schema.optional(Schema.String) }),
+  datepicker: Schema.TaggedStruct("datepicker", { id: Schema.String, size: Size, label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
   menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, items: Schema.Array(MenuItemSchema) }),
   ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */
@@ -285,6 +289,22 @@ export const kanbanNode = <R extends Row>(
     readonly size?: number
   }
 ) => node<Node<"kanban">>("kanban", id, partOf(model as never, KANBAN_ACTIONS as never), config)
+
+/** A form in the page, with its model under the id of the node. */
+export const formNode = <A>(node: Extract<WidgetNode, { readonly _tag: "form" }>, model: FormModel<A>) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(node.id, partOf(model as FormModel, FORM_ACTIONS))
+    return node
+  })
+
+/** A DatePicker in the page: one day, with the model of a Calendar. */
+export const datepickerNode = (node: Extract<WidgetNode, { readonly _tag: "datepicker" }>, model: ValueModel<string | undefined>) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(node.id, partOf(model, VALUE_ACTIONS))
+    return node
+  })
 
 /** A Toolbar, a Button, a Menu or a Ribbon in the page, with its model of clicks under `id`. */
 export const clicksNode = <N extends Extract<WidgetNode, { readonly _tag: "toolbar" | "button" | "menu" | "ribbon" }>>(node: N, model: ClickModel) =>

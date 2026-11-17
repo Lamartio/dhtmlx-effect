@@ -1,5 +1,6 @@
 import { Effect, Exit, Schema, Scope, Stream, SubscriptionRef } from "effect"
 import { clickable, clickModel } from "./clicks"
+import { formModel, rulesCheck } from "./form"
 import { ganttModel } from "./gantt"
 import { gridModel } from "./grid"
 import { calendarModel, colorpickerModel, comboboxModel, sliderModel, timepickerModel } from "./inputs"
@@ -9,7 +10,7 @@ import { schedulerModel } from "./scheduler"
 import { selectionModel, treeModel } from "./selection"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
-  cellsModel, clicksNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
+  cellsModel, clicksNode, datepickerNode, formNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
   WireNodes
 } from "./tree"
 import type { UiState } from "./ui-state"
@@ -42,13 +43,15 @@ export const Tree = WireNodes.tree.mapFields((fields) => ({ ...fields, rows: Row
 export const Gantt = WireNodes.gantt.mapFields((fields) => ({ ...fields, tasks: Schema.Array(TaskSchema) }))
 export const Scheduler = WireNodes.scheduler.mapFields((fields) => ({ ...fields, events: Schema.Array(EventSchema) }))
 export const Kanban = WireNodes.kanban.mapFields((fields) => ({ ...fields, rows: Rows }))
+export const Form = WireNodes.form.mapFields((fields) => ({ ...fields, values: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) }))
+export const DatePicker = WireNodes.datepicker.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
 /** A Toolbar, a Button, a Menu and a Ribbon have no data: their items are config, and a click goes to the plugin. */
 export const Toolbar = WireNodes.toolbar
 export const Button = WireNodes.button
 export const Menu = WireNodes.menu
 export const Ribbon = WireNodes.ribbon
 
-const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon] as const
+const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker] as const
 type Widget = (typeof Widgets)[number]["Type"]
 
 /** A frame of the composed UI, with composed children. */
@@ -159,8 +162,8 @@ export const Tabbar = {
 
 /** The data of a node, which goes into its model; and the node without it, which goes to the page. */
 const split = (node: Widget): { readonly data: unknown; readonly wire: UiNode } => {
-  const { value, rows, tasks, events, ...wire } = node as Widget & { value?: unknown; rows?: unknown; tasks?: unknown; events?: unknown }
-  return { data: value ?? rows ?? tasks ?? events, wire: wire as UiNode }
+  const { value, rows, tasks, events, values, ...wire } = node as Widget & { value?: unknown; rows?: unknown; tasks?: unknown; events?: unknown; values?: unknown }
+  return { data: value ?? rows ?? tasks ?? events ?? values, wire: wire as UiNode }
 }
 
 /** The model of a node, with its data in `data`, in the document under the id of the node. */
@@ -189,6 +192,14 @@ const modelOf = (node: Widget, data: SubscriptionRef.SubscriptionRef<any>, wire:
       return Effect.flatMap(ganttModel({ tasks: data }), (model) => ganttNode(node.id, model, config))
     case "scheduler":
       return Effect.flatMap(schedulerModel({ events: data }), (model) => schedulerNode(node.id, model, config))
+    case "form":
+      // A form with no values in the tree starts empty.
+      return SubscriptionRef.update(data, (values) => values ?? {}).pipe(
+        Effect.andThen(formModel(rulesCheck(node.fields), node.fields, { values: data })),
+        Effect.flatMap((model) => formNode(wire as never, model))
+      )
+    case "datepicker":
+      return Effect.flatMap(calendarModel({ value: data }), (model) => datepickerNode(wire as never, model))
     case "toolbar":
     case "menu":
       return Effect.flatMap(clickModel(clickable(node.items)), (model) => clicksNode(wire as never, model))

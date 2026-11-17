@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Button, Column, Combobox, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/model/nodes"
+import { Button, Column, Combobox, DatePicker, Form, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/model/nodes"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },
@@ -50,6 +50,20 @@ export default Layout.make({
         items: [
           { label: "Issues", icon: "dxi dxi-file-outline", child: grid },
           { label: "Board", icon: "dxi dxi-view-column", child: board },
+          {
+            label: "New issue",
+            icon: "dxi dxi-calendar",
+            child: Form.make({
+              id: "new-issue",
+              submitLabel: "Add",
+              fields: [
+                { name: "title", label: "Title", kind: "text", required: true },
+                { name: "code", label: "Code", kind: "text", pattern: "^[A-Z]{3}$", message: "Three capitals, such as SWI" },
+                { name: "points", label: "Points", kind: "number", min: 0, max: 13 },
+                { name: "due", label: "Due", kind: "date" }
+              ]
+            })
+          },
           { label: "Both", icon: "dxi dxi-tune", child: Tabbar.make({ id: "views", tabs: [{ label: "Points", child: Slider.make({ id: "more-points", label: "More points", min: 0, max: 13, value: 8 }) }] }) }
         ]
       })
@@ -64,6 +78,7 @@ export default Layout.make({
           Toolbar.make({ id: "bar", size: 56, items: [{ title: "Settings" }, { spacer: true }, { id: "reset", label: "Reset", view: "link" }] }),
           Slider.make({ id: "points", label: "Points", min: 0, max: 13, value: 5, size: 90 }),
           Combobox.make({ id: "status", label: "Status", value: "todo", options: [{ value: "todo", label: "To do" }, { value: "doing", label: "Doing" }, { value: "done", label: "Done" }], size: 90 }),
+          DatePicker.make({ id: "day", label: "Day", size: 90 }),
           Button.make({ id: "save", label: "Save", color: "primary", size: 56 })
         ]
       })

@@ -1,128 +1,13 @@
 import { Form, setTheme } from "dhx-suite"
-import { Effect, PubSub, Schema, Scope, Stream, SubscriptionRef } from "effect"
+import { Effect, Schema, Scope, Stream, SubscriptionRef } from "effect"
 import { calendarLocale, check, type Checked, dateToDay, dayToDate } from "../core/form"
 import { Browser, follow } from "./browser"
 import { child, Host, resource } from "./host"
 import { resourceAfterPaint } from "./paint"
 import { calendarNames } from "./inputs"
 
-/**
- * The kinds of field. A day is `YYYY-MM-DD` and a time `HH:mm` (see `Day` and `Time` in core/form.ts).
- *
- * - `radio` is one of the options, as a string: the RadioGroup of DHTMLX.
- * - `checks` and `toggles` are the chosen options, as an array of their values, in the order of the
- *   options: the CheckboxGroup and the ToggleGroup.
- * - `toggle` is a boolean: one Toggle button.
- * - `note` shows its value as text that the user cannot change: the Text control.
- * - `avatar` is one picture, as an `AvatarValue`: the Avatar control.
- * - `files` is a list of picked files, as `FormFile`s: the SimpleVault control.
- *
- * Two kinds have no value. They shape the form:
- *
- * - `fieldset` is a box with a label around its `fields`. The values of those fields stay in the
- *   one flat record of the form.
- * - `spacer` is empty room, with a `height`.
- *
- * The Container control of DHTMLX is not here: it is only in the PRO edition of the Suite.
- */
-export type FieldKind =
-  | "text" | "textarea" | "number" | "checkbox" | "select" | "combo" | "date" | "time" | "slider" | "color"
-  | "radio" | "checks" | "toggle" | "toggles" | "note" | "avatar" | "files"
-  | "fieldset" | "spacer"
-
-/** The picture of an `avatar` field: a link to it, or the file that the user picked. */
-export type AvatarValue = { readonly src?: string; readonly file?: File }
-
-/** One file of a `files` field. The form sends nothing: the app takes `file` and uploads it. */
-export type FormFile = { readonly id: string; readonly name: string; readonly size: number; readonly file?: File }
-
-export type Field = {
-  readonly name: string
-  readonly label?: string
-  readonly kind?: FieldKind
-  /** The choices of a select, a combo, a radio, checks or toggles. */
-  readonly options?: ReadonlyArray<{ readonly value: string; readonly label: string }>
-  /** The range of a slider. */
-  readonly min?: number
-  readonly max?: number
-  readonly step?: number
-  readonly placeholder?: string
-  /** The files that an `avatar` or a `files` field takes, as on an `<input type="file">`, such as `image/*`. */
-  readonly accept?: string
-  /** The fields in a `fieldset`. A field of the Schema that is named here leaves its place in the form. */
-  readonly fields?: ReadonlyArray<Field>
-  /** A `fieldset` puts its fields under each other (`rows`, the default) or next to each other (`cols`). */
-  readonly direction?: "rows" | "cols"
-  /** Pixels, for a `spacer`. */
-  readonly height?: number
-}
-
-/** The kinds that shape the form and hold no value. */
-const isLayout = (field: Field) => field.kind === "fieldset" || field.kind === "spacer"
-
-/** Each field with a value, also the ones in a fieldset. */
-const leaves = (fields: ReadonlyArray<Field>): ReadonlyArray<Field> =>
-  fields.flatMap((field) => (field.kind === "fieldset" ? leaves(field.fields ?? []) : isLayout(field) ? [] : [field]))
-
-
-/** A field kind from the Schema, for a field that names none: a text, a number, a checkbox, or a select of literals. */
-const kindOf = (ast: Schema.Top["ast"]): { readonly kind: FieldKind; readonly options?: ReadonlyArray<{ readonly value: string; readonly label: string }> } => {
-  const node = ast as { readonly _tag: string; readonly literal?: unknown; readonly types?: ReadonlyArray<{ readonly _tag: string; readonly literal?: unknown }> }
-  switch (node._tag) {
-    case "Number":
-      return { kind: "number" }
-    case "Boolean":
-      return { kind: "checkbox" }
-    case "Union": {
-      const literals = (node.types ?? []).filter((type) => type._tag === "Literal").map((type) => String(type.literal))
-      if (literals.length > 0 && literals.length === (node.types ?? []).length) return { kind: "select", options: literals.map((value) => ({ value, label: value })) }
-      return { kind: "text" }
-    }
-    default:
-      return { kind: "text" }
-  }
-}
-
-/**
- * The fields of a Struct Schema, in its order, with a kind from the type of each one. `fields`
- * changes a field by its name, such as a label or the kind `date`, and can add fields. When `fields`
- * has a fieldset or a spacer, it also gives the order of the fields that it names.
- */
-export const fieldsOf = (schema: Schema.Top, fields: ReadonlyArray<Field> = []): ReadonlyArray<Field> => {
-  const given = new Map(fields.map((field) => [field.name, field]))
-  const ast = schema.ast as { readonly _tag: string; readonly propertySignatures?: ReadonlyArray<{ readonly name: PropertyKey; readonly type: Schema.Top["ast"] }> }
-  const signatures = ast._tag === "Objects" ? ast.propertySignatures ?? [] : []
-  const fromSchema = new Map<string, Field>(signatures.map((signature) => {
-    const name = String(signature.name)
-    return [name, { name, label: name[0]!.toUpperCase() + name.slice(1), ...kindOf(signature.type) }]
-  }))
-  // A field in a fieldset takes its kind and label from the Schema too, and leaves the top of the form.
-  const claimed = new Set<string>()
-  const inside = (field: Field): Field => {
-    if (field.kind !== "fieldset") return field
-    return {
-      ...field,
-      fields: (field.fields ?? []).map((one) => {
-        if (one.kind === "fieldset") return inside(one)
-        claimed.add(one.name)
-        return isLayout(one) ? one : { kind: "text" as const, label: one.name, ...fromSchema.get(one.name), ...one }
-      })
-    }
-  }
-  const resolve = (field: Field): Field =>
-    isLayout(field) ? inside(field) : { kind: "text" as const, label: field.name, ...fromSchema.get(field.name), ...field }
-  // With a fieldset or a spacer, `fields` is also the order: first the fields of the Schema that it
-  // does not name, then its fields as they are given.
-  if (fields.some(isLayout)) {
-    const placed = fields.map(resolve)
-    const rest: Array<Field> = []
-    for (const [name, field] of fromSchema) if (!claimed.has(name) && !given.has(name)) rest.push(field)
-    return [...rest, ...placed]
-  }
-  const out: Array<Field> = []
-  for (const [name, field] of fromSchema) out.push({ ...field, ...given.get(name) })
-  return [...out, ...fields.filter((field) => !fromSchema.has(field.name)).map(resolve)]
-}
+export { type AvatarValue, type Field, type FieldKind, fieldsOf, type FormFile } from "../model/form"
+import { type AvatarValue, type Field, type FieldKind, fieldsOf, type FormFile, type FormModel, formModel, leaves, schemaCheck } from "../model/form"
 
 type Values = Readonly<Record<string, unknown>>
 
@@ -299,16 +184,21 @@ export type FormOptions<S extends Schema.Top> = {
  *
  * Days, times and the calendar follow the locale of `Browser`. The theme follows `Browser.dark`.
  */
-export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
+/** What a form draws: its fields, as `fieldsOf` gives them or as data from a plugin, and the text of its button. */
+export type FormView = {
+  readonly fields: ReadonlyArray<Field>
+  /** The text of the button that sends. No button when it is empty. */
+  readonly submitLabel?: string
+}
+
+export const renderForm = <A>(model: FormModel<A>, options: FormView) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const shape = fieldsOf(options.schema, options.fields)
+    const shape = options.fields
     // The fields with a value. The rest of `shape` only places them.
     const fields = leaves(shape)
-    const values = options.values ?? (yield* SubscriptionRef.make<Values>({}))
-    const checked = yield* SubscriptionRef.make<Checked<S["Type"]>>(check(options.schema, yield* SubscriptionRef.get(values)))
-    const submits = yield* Effect.acquireRelease(PubSub.unbounded<S["Type"]>(), PubSub.shutdown)
+    const values = model.values
     const locale = calendarLocale(yield* SubscriptionRef.get(browser.locale))
     const rows: Array<unknown> = shape.map((field) => control(field, locale))
     if (options.submitLabel !== "") rows.push({ type: "button", name: "submit", id: "submit", text: options.submitLabel ?? "Save", size: "medium", view: "flat", color: "primary" })
@@ -324,18 +214,16 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
     const view = yield* resourceAfterPaint("form", () => new Form(place, { css: "dhxe-form", padding: 0, rows: rows as never }), (view) => view.destructor())
     const item = (name: string) => view.getItem(name) as Item | undefined
 
-    // Which fields show their errors: the touched ones, or all after a send.
-    const touched = new Set<string>()
-    let sent = false
-    const showErrors = (result: Checked<S["Type"]>) => {
+    // The model says which errors show: of the touched fields, or of all after a send.
+    const showErrors = (errors: Readonly<Record<string, string>>) => {
       const others: Array<string> = []
-      const whole = result._tag === "invalid" ? result.errors[""] : undefined
-      if (whole !== undefined && sent) others.push(whole)
+      const whole = errors[""]
+      if (whole !== undefined) others.push(whole)
       for (const field of fields) {
         const one = item(field.name)
         if (one === undefined) continue
-        const message = result._tag === "invalid" ? result.errors[field.name] : undefined
-        const show = message !== undefined && (sent || touched.has(field.name))
+        const message = errors[field.name]
+        const show = message !== undefined
         if (one.validate === undefined || !LINE_UNDER.has(field.kind ?? "text")) {
           // A control that shows no error line of its own (a slider, a time): the list under the form.
           if (show) others.push(`${field.label ?? field.name}: ${message}`)
@@ -360,12 +248,9 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
         view.events.on("change" as never, (name: string, raw: unknown) => {
           const field = fields.find((one) => one.name === name)
           if (applying || field === undefined) return
-          touched.add(name)
           // A group and a toggle give the event the part that changed: the whole value is in the item.
           const whole = readsItem(field) ? item(name)?.getValue() : raw
-          const next = { ...Effect.runSync(SubscriptionRef.get(values)), [name]: fromControl(field, whole) }
-          if (next[name] === undefined) delete next[name]
-          Effect.runSync(SubscriptionRef.set(values, next))
+          Effect.runSync(model.change(name, fromControl(field, whole)))
         }),
       () => view.events.detach("change" as never)
     )
@@ -373,11 +258,7 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
       "listener",
       () =>
         view.events.on("click" as never, (name: string) => {
-          if (name !== "submit") return
-          sent = true
-          const result = check(options.schema, Effect.runSync(SubscriptionRef.get(values)))
-          showErrors(result)
-          if (result._tag === "valid") Effect.runSync(PubSub.publish(submits, result.value))
+          if (name === "submit") Effect.runSync(model.submit)
         }),
       () => view.events.detach("click" as never)
     )
@@ -405,10 +286,8 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
       } finally {
         applying = false
       }
-      const result = check(options.schema, next)
-      Effect.runSync(SubscriptionRef.set(checked, result))
-      showErrors(result)
     })
+    yield* follow(model.errors, showErrors)
     let shown = locale
     yield* follow(browser.locale, (tag) => {
       const next = calendarNames(tag)
@@ -422,10 +301,25 @@ export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
       }
     })
     yield* follow(browser.dark, (dark) => setTheme(dark ? "dark" : "light", host))
-    return { form: view, values, checked, submitted: Stream.fromPubSub(submits) }
+    return { form: view, values, model }
+  }) as Effect.Effect<{ readonly form: Form; readonly values: SubscriptionRef.SubscriptionRef<Values>; readonly model: FormModel<A> }, never, Host | Browser | Scope.Scope>
+
+/**
+ * A DHTMLX Form made from an Effect Schema: the model (`formModel` with `schemaCheck`), then
+ * `renderForm`. `checked` is the check of the values of now.
+ */
+export const form = <S extends Schema.Top>(options: FormOptions<S>) =>
+  Effect.gen(function* () {
+    const shape = fieldsOf(options.schema, options.fields)
+    const model = yield* formModel(schemaCheck(options.schema), shape, options.values === undefined ? {} : { values: options.values })
+    const checked = yield* SubscriptionRef.make<Checked<S["Type"]>>(check(options.schema, yield* SubscriptionRef.get(model.values)))
+    yield* follow(model.values, (now) => Effect.runSync(SubscriptionRef.set(checked, check(options.schema, now))))
+    const made = yield* renderForm(model, { fields: shape, ...(options.submitLabel === undefined ? {} : { submitLabel: options.submitLabel }) })
+    return { form: made.form, values: model.values, checked, submitted: model.submitted, model }
   }) as Effect.Effect<{
     readonly form: Form
     readonly values: SubscriptionRef.SubscriptionRef<Values>
     readonly checked: SubscriptionRef.SubscriptionRef<Checked<S["Type"]>>
     readonly submitted: Stream.Stream<S["Type"]>
+    readonly model: FormModel<S["Type"]>
   }, never, Host | Browser | Scope.Scope>

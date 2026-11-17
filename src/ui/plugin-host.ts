@@ -2,7 +2,7 @@ import { Effect, Option, Schema, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteClicks, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
+import { type Host as PluginHost, remoteClicks, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
 import { dataCollection, escapeHtml, renderDataView, renderGrid, renderList, renderTree, treeCollection } from "./data"
@@ -13,6 +13,8 @@ import { renderKanban } from "./kanban"
 import { reporting } from "./problems"
 import { renderScheduler } from "./scheduler"
 import { button } from "./button"
+import { datepicker } from "./datepicker"
+import { renderForm } from "./form"
 import { layout } from "./layout"
 import { gridContextMenu, menu, ribbon } from "./menus"
 import { toolbar, toolbarButton, toolbarSeparator, toolbarSpacer, toolbarTitle } from "./toolbar"
@@ -74,6 +76,15 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
         }
         return made
       }
+      case "form": {
+        return yield* renderForm(yield* remoteForm(page, node.id), { fields: node.fields as never, ...(node.submitLabel === undefined ? {} : { submitLabel: node.submitLabel }) })
+      }
+      case "datepicker":
+        return yield* datepicker({
+          value: yield* chosen<string | undefined>(page, node.id, undefined),
+          ...(node.label === undefined ? {} : { label: node.label }),
+          ...(node.placeholder === undefined ? {} : { placeholder: node.placeholder })
+        })
       case "toolbar": {
         const model = yield* remoteClicks(page, node.id)
         return yield* toolbar(Effect.forEach(node.items, (item) =>
@@ -175,12 +186,13 @@ const childRefs = (node: UiNode, children: SubscriptionRef.SubscriptionRef<Reado
   })
 
 /**
- * The chosen child of tabs or a sidebar, both ways: a click sets `active`, which goes to the plugin
- * as `set`; the value of the plugin comes back into `active`, also after a refusal.
+ * A value of a model in the plugin, both ways, for a widget that sets its own ref (the chosen child
+ * of tabs or a sidebar, the day of a DatePicker): a change sets `active`, which goes to the plugin as
+ * `set`; the value of the plugin comes back into `active`, also after a refusal.
  */
-const chosen = (page: PluginHost, id: string, first: string) =>
+const chosen = <A>(page: PluginHost, id: string, first: A) =>
   Effect.gen(function* () {
-    const model = yield* remoteValue<string>(page, id, first)
+    const model = yield* remoteValue<A>(page, id, first)
     const active = yield* SubscriptionRef.make(yield* SubscriptionRef.get(model.value))
     yield* SubscriptionRef.changes(model.value).pipe(
       Stream.runForEach((value) => Effect.flatMap(SubscriptionRef.get(active), (now) => (now === value ? Effect.void : SubscriptionRef.set(active, value)))),
