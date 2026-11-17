@@ -12,6 +12,7 @@ import { renderCalendar, renderColorpicker, renderCombobox, renderSlider, render
 import { renderKanban } from "./kanban"
 import { reporting } from "./problems"
 import { renderScheduler } from "./scheduler"
+import { tabbar } from "./tabbar"
 
 // A node decoded from JSON has no key with `undefined` in it, so its config fits the options of a
 // renderer, which do not take `undefined` (`exactOptionalPropertyTypes`): hence the casts below.
@@ -42,6 +43,8 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
         host.style.minWidth = "0"
         return yield* keyed(children, (one) => one.id, (one) => nodePart(page, one, node._tag))
       }
+      case "tabbar":
+        return yield* tabsOf(page, node, children)
       case "calendar":
         return yield* renderCalendar(yield* remoteValue<string | undefined>(page, node.id, undefined))
       case "timepicker":
@@ -88,6 +91,52 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
     }
   })
 
+/** A part that fills its host as a flex column with no scroll, as the root does: for the pane of a tab. */
+const fill = <A, E, R>(part: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const host = yield* Host
+    host.style.display = "flex"
+    host.style.flexDirection = "column"
+    host.style.overflow = "hidden"
+    return yield* part
+  })
+
+/**
+ * A Tabbar for a tabbar node: the open tab is the value of the model in the plugin. A click on a tab
+ * is the action `set`; a refused one opens the tab before again. Each tab draws its child as a node,
+ * and a change in a child goes in place.
+ */
+const tabsOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "tabbar" }>, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>) =>
+  Effect.gen(function* () {
+    const ids = node.tabs.map((tab) => tab.child.id)
+    const model = yield* remoteValue<string>(page, node.id, ids[0] ?? "")
+    const items = new Map<string, SubscriptionRef.SubscriptionRef<UiNode>>()
+    for (const tab of node.tabs) items.set(tab.child.id, yield* SubscriptionRef.make(tab.child))
+    yield* SubscriptionRef.changes(children).pipe(
+      Stream.runForEach((all) =>
+        Effect.forEach(all, (one) => {
+          const ref = items.get(one.id)
+          return ref === undefined ? Effect.void : Effect.flatMap(SubscriptionRef.get(ref), (now) => (stableJson(now) === stableJson(one) ? Effect.void : SubscriptionRef.set(ref, one)))
+        }, { discard: true })),
+      reporting(`The tabs ${node.id} of the plugin`),
+      Effect.forkScoped
+    )
+    // The Tabbar sets `active` on a click: that goes to the plugin, and the value of the plugin comes back into it.
+    const active = yield* SubscriptionRef.make(yield* SubscriptionRef.get(model.value))
+    yield* SubscriptionRef.changes(model.value).pipe(
+      Stream.runForEach((id) => Effect.flatMap(SubscriptionRef.get(active), (now) => (now === id ? Effect.void : SubscriptionRef.set(active, id)))),
+      Effect.forkScoped
+    )
+    yield* SubscriptionRef.changes(active).pipe(
+      Stream.runForEach((id) => Effect.flatMap(SubscriptionRef.get(model.value), (now) => (now === id ? Effect.void : model.set(id)))),
+      Effect.forkScoped
+    )
+    return yield* tabbar({
+      active,
+      items: node.tabs.map((tab) => ({ id: tab.child.id, label: tab.label, part: fill(nodePart(page, items.get(tab.child.id)!, "column")) }))
+    })
+  })
+
 /**
  * One node in its own element, sized along its frame. Its widget is made again only when its kind or
  * its config changes (all but the children); new children go into the keyed list of a frame.
@@ -108,7 +157,9 @@ const nodePart = (page: PluginHost, item: SubscriptionRef.SubscriptionRef<UiNode
           element.style.display = "flex"
           element.style.flexDirection = "column"
           if ("children" in node) yield* SubscriptionRef.set(children, node.children)
-          const next = stableJson({ ...node, children: undefined, size: undefined })
+          if (node._tag === "tabbar") yield* SubscriptionRef.set(children, node.tabs.map((tab) => tab.child))
+          // The shape of a node is all but its children (and the size): for tabs, their ids and labels.
+          const next = stableJson({ ...node, children: undefined, size: undefined, tabs: node._tag === "tabbar" ? node.tabs.map((tab) => [tab.child.id, tab.label]) : undefined })
           if (next === shape) return
           shape = next
           yield* show(widgetOf(page, node, children).pipe(Effect.provideService(Host, element)))

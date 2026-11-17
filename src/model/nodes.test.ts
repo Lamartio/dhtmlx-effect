@@ -1,7 +1,7 @@
 import { it } from "@effect/vitest"
 import { Effect, Schema, SubscriptionRef } from "effect"
 import { expect } from "vitest"
-import { bindTree, Column, Grid, Kanban, Row, Slider, type Ui, UiSchema } from "./nodes"
+import { bindTree, Column, Grid, Kanban, Row, Slider, Tabbar, type Ui, UiSchema } from "./nodes"
 import { TREE_KEY } from "./tree"
 import { UiState, uiState } from "./ui-state"
 
@@ -45,4 +45,25 @@ it.effect("keeps a model by id: new data goes in, a new node gets a model, and a
     expect((yield* state())["issues"].selected).toBe("b")
     // The Kanban went: its model is closed, and its key is out of the document.
     expect(Object.keys(yield* state()).sort()).toEqual([TREE_KEY, "issues"].sort())
+  }).pipe(Effect.scoped))
+
+it.effect("keeps the open tab of a tabbar as a model, and refuses a tab that is not there", () =>
+  Effect.gen(function* () {
+    const ui = yield* uiState
+    const tabs = (value?: string) =>
+      Column.make({ id: "main", children: [Tabbar.make({ id: "tabs", ...(value === undefined ? {} : { value }), tabs: [{ label: "Issues", child: grid() }, { label: "Board", child: board }] })] })
+    const trees = yield* SubscriptionRef.make<Ui>(tabs())
+    yield* bindTree(trees).pipe(Effect.provideService(UiState, ui))
+    yield* settle
+    const state = () => Effect.map(ui.full, (full) => full.state as Record<string, any>)
+    expect((yield* state())["tabs"]).toEqual({ value: "issues" })
+    expect((yield* state())[TREE_KEY].children[0].tabs.map((tab: { label: string; child: { id: string } }) => [tab.label, tab.child.id])).toEqual([["Issues", "issues"], ["Board", "board"]])
+    expect(yield* ui.run("tabs", "set", ["board"])).toBe(true)
+    expect(yield* ui.run("tabs", "set", ["nothing"])).toBe(false)
+    yield* settle
+    expect((yield* state())["tabs"]).toEqual({ value: "board" })
+    // The same tabs again keep the open tab; a value in the tree opens that tab.
+    yield* SubscriptionRef.set(trees, tabs())
+    yield* settle
+    expect((yield* state())["tabs"]).toEqual({ value: "board" })
   }).pipe(Effect.scoped))

@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Column, Combobox, Grid, Kanban, Row, Slider } from "../src/model/nodes"
+import { Column, Combobox, Grid, Kanban, Row, Slider, Tabbar } from "../src/model/nodes"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },
@@ -24,26 +24,37 @@ export default Column.make({
         Combobox.make({ id: "status", label: "Status", value: "todo", options: [{ value: "todo", label: "To do" }, { value: "doing", label: "Doing" }, { value: "done", label: "Done" }] })
       ]
     }),
-    Grid.make({
-      id: "issues",
-      size: 240,
-      columns: [
-        { id: "id", header: "#", width: 70 },
-        { id: "title", header: "Title", filter: "input" },
-        { id: "status", header: "Status", filter: "select" }
-      ],
-      rows: issues
-    }),
-    Kanban.make({
-      id: "board",
-      field: "status",
-      labelField: "title",
-      columns: [
-        { id: "todo", label: "To do" },
-        { id: "doing", label: "Doing", limit: 1, strictLimit: true },
-        { id: "done", label: "Done" }
-      ],
-      rows: issues
+    Tabbar.make({
+      id: "views",
+      value: "issues",
+      tabs: [
+        {
+          label: "Issues",
+          child: Grid.make({
+            id: "issues",
+            columns: [
+              { id: "id", header: "#", width: 70 },
+              { id: "title", header: "Title", filter: "input" },
+              { id: "status", header: "Status", filter: "select" }
+            ],
+            rows: issues
+          })
+        },
+        {
+          label: "Board",
+          child: Kanban.make({
+            id: "board",
+            field: "status",
+            labelField: "title",
+            columns: [
+              { id: "todo", label: "To do" },
+              { id: "doing", label: "Doing", limit: 1, strictLimit: true },
+              { id: "done", label: "Done" }
+            ],
+            rows: issues
+          })
+        }
+      ]
     })
   ]
 })

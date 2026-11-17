@@ -1,7 +1,8 @@
 import { Effect, Schema, type Scope, Stream, SubscriptionRef } from "effect"
 import { GANTT_ACTIONS, type GanttModel } from "./gantt"
 import { GRID_ACTIONS, type GridColumn, type GridModel } from "./grid"
-import { VALUE_ACTIONS, type ValueModel } from "./inputs"
+import { VALUE_ACTIONS, type ValueModel, valueModel } from "./inputs"
+import type { Input } from "./model"
 import { type KanbanColumn, type KanbanLane, KANBAN_ACTIONS, type KanbanModel } from "./kanban"
 import type { Row } from "../core/rows"
 import { SCHEDULER_ACTIONS, type SchedulerModel } from "./scheduler"
@@ -75,7 +76,12 @@ export type WidgetNode = typeof WidgetNodeSchema.Type
 
 /** A frame: its children from top to bottom (`column`) or from left to right (`row`). */
 export type FrameNode = { readonly _tag: "column" | "row"; readonly id: string; readonly size?: number | undefined; readonly children: ReadonlyArray<UiNode> }
-export type UiNode = WidgetNode | FrameNode
+/**
+ * Tabs, each with a label and a child node; the id of a tab is the id of its child. The open tab is
+ * the state of a model under the id of the tabbar (`tabsModel`), and the page draws only that tab.
+ */
+export type TabbarNode = { readonly _tag: "tabbar"; readonly id: string; readonly size?: number | undefined; readonly tabs: ReadonlyArray<{ readonly label: string; readonly child: UiNode }> }
+export type UiNode = WidgetNode | FrameNode | TabbarNode
 
 export const UiNodeSchema: Schema.Codec<UiNode> = Schema.Union([
   WidgetNodeSchema,
@@ -84,6 +90,12 @@ export const UiNodeSchema: Schema.Codec<UiNode> = Schema.Union([
     id: Schema.String,
     size: Size,
     children: Schema.Array(Schema.suspend((): Schema.Codec<UiNode> => UiNodeSchema))
+  }),
+  Schema.Struct({
+    _tag: Schema.Literal("tabbar"),
+    id: Schema.String,
+    size: Size,
+    tabs: Schema.Array(Schema.Struct({ label: Schema.String, child: Schema.suspend((): Schema.Codec<UiNode> => UiNodeSchema) }))
   })
 ]) as never
 
@@ -100,6 +112,18 @@ const node = <N extends WidgetNode>(tag: N["_tag"], id: string, part: Parameters
 
 export const column = (id: string, children: ReadonlyArray<UiNode>, size?: number): FrameNode => ({ _tag: "column", id, children, size })
 export const row = (id: string, children: ReadonlyArray<UiNode>, size?: number): FrameNode => ({ _tag: "row", id, children, size })
+
+/** The model of a tabbar: the id of the open tab, one of `ids`. Another id is refused. */
+export const tabsModel = (ids: ReadonlyArray<string>, value?: Input<string>) =>
+  valueModel<string>(value === undefined ? {} : { value }, ids[0] ?? "", { accepts: (id) => ids.includes(id) })
+
+/** A tabbar in the page, with its model under `id`. */
+export const tabbarNode = (id: string, model: ValueModel<string>, tabs: TabbarNode["tabs"], size?: number) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(id, partOf(model, VALUE_ACTIONS))
+    return { _tag: "tabbar", id, tabs, ...(size === undefined ? {} : { size }) } satisfies TabbarNode
+  })
 
 type Node<T extends WidgetNode["_tag"]> = Extract<WidgetNode, { readonly _tag: T }>
 

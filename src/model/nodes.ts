@@ -8,7 +8,7 @@ import { schedulerModel } from "./scheduler"
 import { selectionModel, treeModel } from "./selection"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
-  timepickerNode, treeNode, type UiNode, WireNodes
+  tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode, WireNodes
 } from "./tree"
 import type { UiState } from "./ui-state"
 
@@ -46,12 +46,27 @@ type Widget = (typeof Widgets)[number]["Type"]
 
 /** A frame of the composed UI, with composed children. */
 export type Frame = { readonly _tag: "column" | "row"; readonly id: string; readonly size?: number | undefined; readonly children: ReadonlyArray<Ui> }
-/** A node of the composed UI: a widget with its data, or a frame. */
-export type Ui = Widget | Frame
+/** Tabs of the composed UI, each with a label and a child; `value` is the id of the tab that opens first. */
+export type Tabs = {
+  readonly _tag: "tabbar"
+  readonly id: string
+  readonly size?: number | undefined
+  readonly value?: string | undefined
+  readonly tabs: ReadonlyArray<{ readonly label: string; readonly child: Ui }>
+}
+/** A node of the composed UI: a widget with its data, a frame, or tabs. */
+export type Ui = Widget | Frame | Tabs
 
 export const UiSchema: Schema.Codec<Ui> = Schema.Union([
   ...Widgets,
-  Schema.Struct({ _tag: Schema.Literals(["column", "row"]), id: Schema.String, size: Schema.optional(Schema.Number), children: Schema.Array(Schema.suspend((): Schema.Codec<Ui> => UiSchema)) })
+  Schema.Struct({ _tag: Schema.Literals(["column", "row"]), id: Schema.String, size: Schema.optional(Schema.Number), children: Schema.Array(Schema.suspend((): Schema.Codec<Ui> => UiSchema)) }),
+  Schema.Struct({
+    _tag: Schema.Literal("tabbar"),
+    id: Schema.String,
+    size: Schema.optional(Schema.Number),
+    value: Schema.optional(Schema.String),
+    tabs: Schema.Array(Schema.Struct({ label: Schema.String, child: Schema.suspend((): Schema.Codec<Ui> => UiSchema) }))
+  })
 ]) as never
 
 const frame = (tag: "column" | "row") => ({
@@ -65,6 +80,15 @@ const frame = (tag: "column" | "row") => ({
 export const Column = frame("column")
 /** A frame: its children from left to right. */
 export const Row = frame("row")
+
+/** Tabs, each with a label and a child node. The page draws only the open tab; a click on a tab goes to the plugin. */
+export const Tabbar = {
+  make: (input: Omit<Tabs, "_tag">): Tabs => {
+    const made: Tabs = { _tag: "tabbar", ...input }
+    Schema.decodeUnknownSync(UiSchema)(made)
+    return made
+  }
+}
 
 /** The data of a node, which goes into its model; and the node without it, which goes to the page. */
 const split = (node: Widget): { readonly data: unknown; readonly wire: UiNode } => {
@@ -130,23 +154,40 @@ export const bindTree = (source: Input<Ui>): Effect.Effect<void, never, UiState 
           for (const one of node.children) children.push(yield* visit(one, seen))
           return { _tag: node._tag, id: node.id, children, ...(node.size === undefined ? {} : { size: node.size }) }
         }
+        if (node._tag === "tabbar") {
+          const tabs: Array<{ readonly label: string; readonly child: UiNode }> = []
+          for (const tab of node.tabs) tabs.push({ label: tab.label, child: yield* visit(tab.child, seen) })
+          const ids = node.tabs.map((tab) => tab.child.id)
+          const wire: TabbarNode = { _tag: "tabbar", id: node.id, tabs, ...(node.size === undefined ? {} : { size: node.size }) }
+          // The model of the open tab stays while the same tabs are there.
+          yield* keep(node.id, stableJson(ids), node.value ?? ids[0], (data) => Effect.flatMap(tabsModel(ids, data), (model) => tabbarNode(node.id, model, tabs)))
+          return wire
+        }
         const widget = node as Widget
         const { data, wire } = split(widget)
-        const shape = stableJson(wire)
-        const was = kept.get(node.id)
+        return yield* keep(node.id, stableJson(wire), data, (ref) => modelOf(widget, ref, wire))
+      })
+
+    /**
+     * The model under `id`: kept while its `shape` stays, with new data put in; made again when the
+     * shape changes. Gives the node of the page that its maker gave.
+     */
+    const keep = <N extends UiNode>(id: string, shape: string, data: unknown, make: (data: SubscriptionRef.SubscriptionRef<any>) => Effect.Effect<N, never, UiState | Scope.Scope>) =>
+      Effect.gen(function* () {
+        const was = kept.get(id)
         if (was !== undefined && was.shape === shape) {
           const next = stableJson(data)
           if (next !== was.last) {
             was.last = next
             yield* SubscriptionRef.set(was.data, data)
           }
-          return was.wire
+          return was.wire as N
         }
         if (was !== undefined) yield* Scope.close(was.scope, Exit.void)
         const scope = yield* Scope.make()
         const ref = yield* SubscriptionRef.make<unknown>(data)
-        const made = yield* modelOf(widget, ref, wire).pipe(Scope.provide(scope))
-        kept.set(node.id, { scope, data: ref, shape, last: stableJson(data), wire: made })
+        const made = yield* make(ref).pipe(Scope.provide(scope))
+        kept.set(id, { scope, data: ref, shape, last: stableJson(data), wire: made })
         return made
       })
 
