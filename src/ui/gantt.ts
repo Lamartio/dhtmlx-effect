@@ -27,11 +27,10 @@ const listen = (chart: GanttStatic, event: string, f: (id: string | number) => v
  * The Gantt runs on its model (`ganttModel`): a drag, a resize, a new name, a new task and a delete
  * in the Gantt are its actions, and the plan and the zoom of the model show in the Gantt.
  */
-export const gantt = (options: GanttOptions) =>
+export const renderGantt = (model: GanttModel) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const model = yield* ganttModel(options)
     const chart = yield* resource("gantt", () => makeChart(host), (chart) => chart.destructor())
 
     // From the plan to the Gantt, as changes: a scan over the snapshots gives the changes between two
@@ -89,3 +88,5 @@ export const gantt = (options: GanttOptions) =>
       model: model as GanttModel
     }
   })
+
+export const gantt = (options: GanttOptions) => Effect.flatMap(ganttModel(options), renderGantt)

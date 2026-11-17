@@ -54,6 +54,9 @@ export type GanttModel = {
   readonly snapshot: Effect.Effect<GanttState>
 }
 
+/** The actions of a `GanttModel`, by name. */
+export const GANTT_ACTIONS = ["zoomIn", "zoomOut", "addTask", "putTask", "removeTask"] as const satisfies ReadonlyArray<keyof GanttModel>
+
 export type GanttModelOptions = {
   readonly tasks: Input<ReadonlyArray<Task>>
   /** Default: `day`. */

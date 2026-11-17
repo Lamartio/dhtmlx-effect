@@ -9,7 +9,8 @@ import { Day, Time } from "../core/form"
 import { Browser, browserWith, setFacts, type BrowserFacts } from "./browser"
 import { fieldsOf, form } from "./form"
 import { alive, Host } from "./host"
-import { calendar, colorpicker, combobox, filePicker, slider, timepicker } from "./inputs"
+import { calendar, colorpicker, combobox, filePicker, renderSlider, slider, timepicker } from "./inputs"
+import { sliderModel } from "../model/inputs"
 
 const FACTS: BrowserFacts = {
   dark: false,
@@ -287,3 +288,17 @@ it.live("writes a click on a radio button, a check, a toggle and a toggle of a g
     // In the order of the options, not of the clicks.
     expect(yield* now("days")).toEqual(["mon", "tue"])
   })))
+
+it.live("draws a model that was made before, so the model can come from somewhere else", () =>
+  run(Effect.gen(function* () {
+    const model = yield* sliderModel({ value: 4 })
+    const { slider: view } = yield* renderSlider(model, { min: 0, max: 13 })
+    yield* settle
+    expect(view.getValue()).toEqual([4])
+    yield* model.set(9)
+    yield* settle
+    expect(view.getValue()).toEqual([9])
+    view.setValue(2)
+    yield* settle
+    expect((yield* model.snapshot).value).toBe(2)
+  }), { ...FACTS, locale: "en-GB" }))

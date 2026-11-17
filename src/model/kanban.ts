@@ -41,6 +41,9 @@ export type KanbanModel<R extends Row> = {
   readonly snapshot: Effect.Effect<KanbanState>
 }
 
+/** The actions of a `KanbanModel`, by name. */
+export const KANBAN_ACTIONS = ["move", "select", "open"] as const satisfies ReadonlyArray<keyof KanbanModel<Row>>
+
 export type KanbanModelOptions<R extends Row> = {
   /** The rows, such as the issues of a tracker. Each one is a card. */
   readonly rows: Input<ReadonlyArray<R>>

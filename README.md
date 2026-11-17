@@ -143,6 +143,8 @@ yield* hashOf(yield* model.snapshot)     // a SHA-256, to compare a state before
 
 An option can be a value, a `SubscriptionRef` that both sides share, or a `Stream` (`input`). Each widget gives its model too: `slider(options)` gives `{ slider, value, model }`.
 
+A renderer takes a model that was made before: `slider(options)` is `sliderModel(options)` then `renderSlider(model, view)`. So the model can live somewhere else, such as in another frame. Each model type lists its actions (`GRID_ACTIONS`, `KANBAN_ACTIONS`, ...), and `dispatch(model, GRID_ACTIONS, "select", ["b"])` runs one by its name.
+
 ### A widget never stops in silence
 
 A fiber of a widget that dies reports to the `Problems` service. `mount` shows the report in a red bar at the top of the tree, and writes it to the log. A callback that DHTMLX calls cannot throw into DHTMLX (`reportedCallback`). A tree that cannot start closes.

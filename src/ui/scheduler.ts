@@ -81,13 +81,11 @@ export type SchedulerOptions = SchedulerModelOptions
  * The Scheduler runs on its model (`schedulerModel`): a drag, a resize, a click and a change of the
  * view in the Scheduler are its actions, and the events, the view and the day of the model show in it.
  */
-export const scheduler = (options: SchedulerOptions) =>
+export const renderScheduler = (model: SchedulerModel) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
     const zone = { now: yield* SubscriptionRef.get(browser.timeZone) }
-    const today = zoned(yield* SubscriptionRef.get(browser.now), zone.now).day
-    const model = yield* schedulerModel({ ...options, date: options.date ?? today })
     const { view, date } = model
     host.classList.add("dhxe-scheduler")
     const chart = yield* resource("scheduler", takeScheduler, (chart) => giveBack(chart, host))
@@ -188,3 +186,11 @@ export const scheduler = (options: SchedulerOptions) =>
     readonly opened: Stream.Stream<string>
     readonly model: SchedulerModel
   }, never, Host | Browser | Scope.Scope>
+
+/** The Scheduler with its own model. With no `date`, it opens on today in `Browser.timeZone`. */
+export const scheduler = (options: SchedulerOptions) =>
+  Effect.gen(function* () {
+    const browser = yield* Browser
+    const today = zoned(yield* SubscriptionRef.get(browser.now), yield* SubscriptionRef.get(browser.timeZone)).day
+    return yield* renderScheduler(yield* schedulerModel({ ...options, date: options.date ?? today }))
+  })

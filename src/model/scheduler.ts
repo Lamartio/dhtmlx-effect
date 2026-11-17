@@ -34,6 +34,9 @@ export type SchedulerModel = {
   readonly snapshot: Effect.Effect<SchedulerState>
 }
 
+/** The actions of a `SchedulerModel`, by name. */
+export const SCHEDULER_ACTIONS = ["showView", "showDate", "updateEvent", "removeEvent", "open"] as const satisfies ReadonlyArray<keyof SchedulerModel>
+
 export type SchedulerModelOptions = {
   readonly events: Input<ReadonlyArray<CalendarEvent>>
   /** Default: `week`. */

@@ -1,7 +1,7 @@
 import { DataCollection, DataView, Grid, List, setTheme, Tree, TreeCollection } from "dhx-suite"
 import { Effect, Option, Scope, Stream, SubscriptionRef } from "effect"
 import { diffRows, type Row, type RowOp } from "../core/rows"
-import { type GridEdit, type GridModel, gridModel, type GridModelOptions } from "../model/grid"
+import { type GridColumn, type GridEdit, type GridModel, gridModel, type GridModelOptions } from "../model/grid"
 import type { Input } from "../model/model"
 import { type SelectionModel, selectionModel, type SelectionOptions, type TreeModel, treeModel } from "../model/selection"
 import { Browser, follow } from "./browser"
@@ -140,10 +140,9 @@ const FILTERS = { input: "inputFilter", select: "selectFilter", combo: "comboFil
  * its actions, and the selected row, the sort and the filters of the model show in the Grid. The
  * model cannot clear a sort: DHTMLX keeps the order it has.
  */
-export const grid = (options: { readonly data: DataCollection } & Omit<GridModelOptions<Row>, "rows">) =>
+export const renderGrid = (model: GridModel, options: { readonly data: DataCollection; readonly columns: ReadonlyArray<GridColumn> }) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const model = yield* gridModel(options)
     const view = yield* resourceAfterPaint(
       "grid",
       () =>
@@ -237,19 +236,15 @@ export const grid = (options: { readonly data: DataCollection } & Omit<GridModel
     Host | Browser | Scope.Scope
   >
 
+export const grid = (options: { readonly data: DataCollection } & Omit<GridModelOptions<Row>, "rows">) => Effect.flatMap(gridModel(options), (model) => renderGrid(model, options))
+
 /**
  * A DHTMLX Tree on a tree collection: folders that open and close, and the selected item both ways.
  * `expanded` holds the open folders, both ways too. An item shows its `value`. The theme follows `Browser.dark`.
  */
-export const tree = (options: {
-  readonly data: TreeCollection
-  readonly expanded?: Input<ReadonlyArray<string>>
-  /** An item as HTML, in place of its `value`. Escape the text with `escapeHtml`. */
-  readonly template?: (item: Record<string, unknown>, isFolder: boolean) => string
-} & Selected) =>
+export const renderTree = (model: TreeModel, options: TreeView) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const model = yield* treeModel(options)
     const view = yield* resourceAfterPaint("tree", () => new Tree(host, { data: options.data as never, css: "dhxe-tree", ...(options.template === undefined ? {} : { template: options.template as never }) }), (view) => view.destructor())
     yield* theme
     yield* selectedRef(view.selection as unknown as Selection, model)
@@ -297,6 +292,14 @@ export const tree = (options: {
     readonly model: TreeModel
   }, never, Host | Browser | Scope.Scope>
 
+export type TreeView = {
+  readonly data: TreeCollection
+  /** An item as HTML, in place of its `value`. Escape the text with `escapeHtml`. */
+  readonly template?: (item: Record<string, unknown>, isFolder: boolean) => string
+}
+
+export const tree = (options: TreeView & Selected & { readonly expanded?: Input<ReadonlyArray<string>> }) => Effect.flatMap(treeModel(options), (model) => renderTree(model, options))
+
 /** A row or a tile as HTML. Escape the text of a row with `escapeHtml`: the result goes in as HTML. */
 export type Template = (item: Record<string, unknown>) => string
 
@@ -304,10 +307,9 @@ export const escapeHtml = (text: unknown) =>
   String(text).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!)
 
 /** A DHTMLX List on a collection: one row for each item, and the selected row both ways. */
-export const list = (options: { readonly data: DataCollection; readonly template: Template; readonly itemHeight?: number } & Selected) =>
+export const renderList = (model: SelectionModel, options: { readonly data: DataCollection; readonly template: Template; readonly itemHeight?: number }) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const model = yield* selectionModel(options)
     const view = yield* resourceAfterPaint(
       "list",
       () =>
@@ -327,15 +329,16 @@ export const list = (options: { readonly data: DataCollection; readonly template
     return { list: view, selected: model.selected, model }
   }) as Effect.Effect<{ readonly list: List; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>; readonly model: SelectionModel }, never, Host | Browser | Scope.Scope>
 
+export const list = (options: { readonly data: DataCollection; readonly template: Template; readonly itemHeight?: number } & Selected) => Effect.flatMap(selectionModel(options), (model) => renderList(model, options))
+
 /**
  * A DHTMLX DataView on a collection: one tile for each item, in rows of tiles, and the selected tile
  * both ways. Fewer tiles in a row on a narrow window.
  */
-export const dataView = (options: { readonly data: DataCollection; readonly template: Template; readonly itemsInRow?: number } & Selected) =>
+export const renderDataView = (model: SelectionModel, options: { readonly data: DataCollection; readonly template: Template; readonly itemsInRow?: number }) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const model = yield* selectionModel(options)
     const wide = options.itemsInRow ?? 4
     const view = yield* resourceAfterPaint(
       "dataview",
@@ -362,3 +365,5 @@ export const dataView = (options: { readonly data: DataCollection; readonly temp
     })
     return { dataView: view, selected: model.selected, model }
   }) as Effect.Effect<{ readonly dataView: DataView; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>; readonly model: SelectionModel }, never, Host | Browser | Scope.Scope>
+
+export const dataView = (options: { readonly data: DataCollection; readonly template: Template; readonly itemsInRow?: number } & Selected) => Effect.flatMap(selectionModel(options), (model) => renderDataView(model, options))

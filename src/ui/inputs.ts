@@ -54,11 +54,10 @@ export const calendarNames = (locale: string) => {
  * days and the first day of the week follow the locale of `Browser`; with no day, it opens on the
  * day of `Browser.now` in `Browser.timeZone`.
  */
-export const calendar = (options: ValueOptions<string | undefined> = {}) =>
+export const renderCalendar = (model: ValueModel<string | undefined>) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const model = yield* calendarModel(options)
     const value = model.value
     const names = calendarNames(yield* SubscriptionRef.get(browser.locale))
     const start = yield* SubscriptionRef.get(value)
@@ -91,14 +90,15 @@ export const calendar = (options: ValueOptions<string | undefined> = {}) =>
     return { calendar: view, value, model }
   }) as Effect.Effect<{ readonly calendar: Calendar; readonly value: SubscriptionRef.SubscriptionRef<string | undefined>; readonly model: ValueModel<string | undefined> }, never, Host | Browser | Scope.Scope>
 
+export const calendar = (options: ValueOptions<string | undefined> = {}) => Effect.flatMap(calendarModel(options), renderCalendar)
+
 const pad = (n: number) => String(n).padStart(2, "0")
 
 /** A DHTMLX Timepicker. The time is `HH:mm`, 24 hours; the picker shows 12 or 24 hours, as the locale does. */
-export const timepicker = (options: ValueOptions<string> = {}) =>
+export const renderTimepicker = (model: ValueModel<string>) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const model = yield* timepickerModel(options)
     const value = model.value
     const twelve = calendarLocale(yield* SubscriptionRef.get(browser.locale)).twelveHours
     const view = yield* resource(
@@ -127,11 +127,12 @@ export const timepicker = (options: ValueOptions<string> = {}) =>
     return { timepicker: view, value, model }
   }) as Effect.Effect<{ readonly timepicker: Timepicker; readonly value: SubscriptionRef.SubscriptionRef<string>; readonly model: ValueModel<string> }, never, Host | Browser | Scope.Scope>
 
+export const timepicker = (options: ValueOptions<string> = {}) => Effect.flatMap(timepickerModel(options), renderTimepicker)
+
 /** A DHTMLX Slider with one thumb. */
-export const slider = (options: ValueOptions<number> & { readonly min?: number; readonly max?: number; readonly step?: number; readonly label?: string }) =>
+export const renderSlider = (model: ValueModel<number>, options: SliderView = {}) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const model = yield* sliderModel(options)
     const value = model.value
     const view = yield* resource(
       "slider",
@@ -151,11 +152,14 @@ export const slider = (options: ValueOptions<number> & { readonly min?: number; 
     return { slider: view, value, model }
   }) as Effect.Effect<{ readonly slider: Slider; readonly value: SubscriptionRef.SubscriptionRef<number>; readonly model: ValueModel<number> }, never, Host | Browser | Scope.Scope>
 
+export type SliderView = { readonly min?: number; readonly max?: number; readonly step?: number; readonly label?: string }
+
+export const slider = (options: ValueOptions<number> & SliderView) => Effect.flatMap(sliderModel(options), (model) => renderSlider(model, options))
+
 /** A DHTMLX Colorpicker. The colour is `#rrggbb`. */
-export const colorpicker = (options: ValueOptions<string> = {}) =>
+export const renderColorpicker = (model: ValueModel<string>) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const model = yield* colorpickerModel(options)
     const value = model.value
     const view = yield* resource("colorpicker", () => new Colorpicker(host, { css: "dhxe-colorpicker" }), (view) => view.destructor())
     yield* themed
@@ -170,15 +174,12 @@ export const colorpicker = (options: ValueOptions<string> = {}) =>
     return { colorpicker: view, value, model }
   }) as Effect.Effect<{ readonly colorpicker: Colorpicker; readonly value: SubscriptionRef.SubscriptionRef<string>; readonly model: ValueModel<string> }, never, Host | Browser | Scope.Scope>
 
+export const colorpicker = (options: ValueOptions<string> = {}) => Effect.flatMap(colorpickerModel(options), renderColorpicker)
+
 /** A DHTMLX Combobox with one choice: the value is the id of the chosen option, or undefined. */
-export const combobox = (options: {
-  readonly options: ReadonlyArray<{ readonly value: string; readonly label: string }>
-  readonly label?: string
-  readonly placeholder?: string
-} & ValueOptions<string | undefined>) =>
+export const renderCombobox = (model: ValueModel<string | undefined>, options: ComboboxView) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const model = yield* comboboxModel(options)
     const value = model.value
     const view = yield* resource(
       "combobox",
@@ -201,6 +202,14 @@ export const combobox = (options: {
     })
     return { combobox: view, value, model }
   }) as Effect.Effect<{ readonly combobox: Combobox; readonly value: SubscriptionRef.SubscriptionRef<string | undefined>; readonly model: ValueModel<string | undefined> }, never, Host | Browser | Scope.Scope>
+
+export type ComboboxView = {
+  readonly options: ReadonlyArray<{ readonly value: string; readonly label: string }>
+  readonly label?: string
+  readonly placeholder?: string
+}
+
+export const combobox = (options: ComboboxView & ValueOptions<string | undefined>) => Effect.flatMap(comboboxModel(options), (model) => renderCombobox(model, options))
 
 /**
  * Picks files, with a button or a drop on the host: only the part of the DHTMLX Uploader that picks.

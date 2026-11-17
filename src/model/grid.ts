@@ -57,6 +57,9 @@ export type GridModel = {
   readonly snapshot: Effect.Effect<GridState>
 }
 
+/** The actions of a `GridModel`, by name. */
+export const GRID_ACTIONS = ["select", "sortBy", "filter", "edit"] as const satisfies ReadonlyArray<keyof GridModel>
+
 export type GridModelOptions<R extends { readonly id: string }> = {
   readonly columns: ReadonlyArray<GridColumn>
   /** The rows. With none, the model does not check that a row is there: the renderer does. */

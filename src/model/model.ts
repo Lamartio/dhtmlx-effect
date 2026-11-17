@@ -62,3 +62,15 @@ export const hashOf = (value: unknown) =>
   Effect.promise(() => crypto.subtle.digest("SHA-256", new TextEncoder().encode(stableJson(value)))).pipe(
     Effect.map((digest) => [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join(""))
   )
+
+/**
+ * Runs the action `name` of a model with `args`, as a message from another frame asks: one way to
+ * reach each action by its name. `actions` is the list of the model type, such as `GRID_ACTIONS`.
+ * Gives false for a name that is not in the list, and runs nothing then.
+ */
+export const dispatch = <M extends object>(model: M, actions: ReadonlyArray<keyof M & string>, name: string, args: ReadonlyArray<unknown> = []): Effect.Effect<boolean> => {
+  if (!(actions as ReadonlyArray<string>).includes(name)) return Effect.succeed(false)
+  const action = model[name as keyof M] as unknown
+  const run = typeof action === "function" ? (action as (...all: ReadonlyArray<unknown>) => unknown)(...args) : action
+  return Effect.isEffect(run) ? Effect.as(run as Effect.Effect<unknown>, true) : Effect.succeed(false)
+}

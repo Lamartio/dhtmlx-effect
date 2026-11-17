@@ -16,6 +16,9 @@ export type ValueModel<A> = {
   readonly snapshot: Effect.Effect<{ readonly value: A }>
 }
 
+/** The actions of a `ValueModel`, by name. */
+export const VALUE_ACTIONS = ["set"] as const satisfies ReadonlyArray<keyof ValueModel<unknown>>
+
 export type ValueOptions<A> = {
   readonly value?: Input<A>
   /** How many entries `recent` keeps. Default: 0. */

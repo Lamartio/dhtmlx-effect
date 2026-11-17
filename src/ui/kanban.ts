@@ -29,8 +29,8 @@ export type KanbanShape = Omit<NonNullable<KanbanConfig["cardShape"]>, "menu">
 /** The other fields of a card: `priority`, `color`, `progress`, `users`, `start_date`, `end_date`. */
 export type KanbanFields = Omit<KanbanConfig["cards"][number], "id" | "label" | "description">
 
-/** The rows, the field of the column (a drag to another column changes it), the columns and the lanes, as the model takes them; and how a card looks. */
-export type KanbanOptions<R extends Row> = KanbanModelOptions<R> & {
+/** What the Kanban draws: the field of the column and of the lane, the columns and the lanes, and how a card looks. */
+export type KanbanView<R extends Row> = Pick<KanbanModelOptions<R>, "field" | "columns" | "lanes"> & {
   /** The text on a card. */
   readonly label: (row: R) => string
   /** A second line on a card. */
@@ -39,6 +39,9 @@ export type KanbanOptions<R extends Row> = KanbanModelOptions<R> & {
   readonly fields?: (row: R) => KanbanFields
   readonly shape?: KanbanShape
 }
+
+/** The rows (a drag to another column changes the field of the column), as the model takes them, and the view. */
+export type KanbanOptions<R extends Row> = KanbanModelOptions<R> & KanbanView<R>
 
 /** The language of the Kanban for a BCP 47 tag; English when it has none. */
 export const kanbanLanguage = (locale: string): keyof typeof locales => {
@@ -56,11 +59,10 @@ export const kanbanLanguage = (locale: string): keyof typeof locales => {
  * The Kanban runs on its model (`kanbanModel`): a drag is the action `move`, and a click is `select`
  * and `open`. The selected card of the model does not go back into the Kanban yet.
  */
-export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
+export const renderKanban = <R extends Row>(model: KanbanModel<R>, options: KanbanView<R>) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const model = yield* kanbanModel(options)
     const lane = options.lanes?.field
     const card = (row: R): Readonly<Record<string, unknown>> => {
       const description = options.description?.(row)
@@ -140,6 +142,8 @@ export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
     yield* follow(browser.locale, (tag) => board.setLocale(locales[kanbanLanguage(tag)]))
     return { kanban: board, opened: model.opened, model }
   }) as Effect.Effect<{ readonly kanban: Kanban; readonly opened: Stream.Stream<string>; readonly model: KanbanModel<R> }, never, Host | Browser | Scope.Scope>
+
+export const kanban = <R extends Row>(options: KanbanOptions<R>) => Effect.flatMap(kanbanModel(options), (model) => renderKanban(model, options))
 
 /**
  * The toolbar of a Kanban in the host: a search box and a sort menu over the cards of `board`. It only

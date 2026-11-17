@@ -35,6 +35,9 @@ export type SelectionModel = {
   readonly snapshot: Effect.Effect<SelectionState>
 }
 
+/** The actions of a `SelectionModel`, by name. */
+export const SELECTION_ACTIONS = ["select"] as const satisfies ReadonlyArray<keyof SelectionModel>
+
 export type SelectionOptions = {
   /** The rows. With none, the model does not check that a row is there. */
   readonly rows?: Input<ReadonlyArray<Row>>
@@ -79,6 +82,9 @@ export type TreeModel = Omit<SelectionModel, "snapshot"> & {
   readonly collapse: (id: string) => Effect.Effect<void>
   readonly snapshot: Effect.Effect<TreeState>
 }
+
+/** The actions of a `TreeModel`, by name. */
+export const TREE_ACTIONS = ["select", "expand", "collapse"] as const satisfies ReadonlyArray<keyof TreeModel>
 
 /** The model of a Tree: the selected row and the open folders. A row goes under the row of its `parent`. */
 export const treeModel = (options: SelectionOptions & { readonly expanded?: Input<ReadonlyArray<string>> } = {}): Effect.Effect<TreeModel, never, Scope.Scope> =>
