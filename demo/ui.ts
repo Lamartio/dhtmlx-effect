@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Booking, Button, Chart, Column, Combobox, DatePicker, Diagram, FilePicker, Form, Grid, Kanban, Layout, Pivot, RichText, Sidebar, Slider, Spreadsheet, Tabbar, Todo, Toolbar, VaultNode } from "../src/plugin"
+import { Booking, Button, Chart, Column, Combobox, DatePicker, Diagram, FilePicker, Form, Grid, Kanban, Layout, Pivot, RichText, Sidebar, Slider, Spreadsheet, Tabbar, Todo, Toolbar, VaultNode, Window } from "../src/plugin"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },
@@ -151,7 +151,9 @@ export default Layout.make({
           Slider.make({ id: "points", label: "Points", min: 0, max: 13, value: 5, size: 90 }),
           Combobox.make({ id: "status", label: "Status", value: "todo", options: [{ value: "todo", label: "To do" }, { value: "doing", label: "Doing" }, { value: "done", label: "Done" }], size: 90 }),
           DatePicker.make({ id: "day", label: "Day", size: 90 }),
-          Button.make({ id: "save", label: "Save", color: "primary", size: 56 })
+          Button.make({ id: "save", label: "Save", color: "primary", size: 56, tooltip: "Saves the settings" }),
+          // Set open to true and save: the window opens. Its cross goes to the plugin as help.close.
+          Window.make({ id: "help", title: "Help", open: false, width: 420, height: 260, child: Column.make({ id: "help-body", children: [Slider.make({ id: "help-zoom", label: "Zoom", min: 1, max: 5, value: 2, size: 90 }), Button.make({ id: "help-done", label: "Done", size: 56 })] }) })
         ]
       })
     }

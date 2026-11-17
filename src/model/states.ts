@@ -37,6 +37,7 @@ export const STATES = {
   tabbar: value(Schema.String),
   sidebar: value(Schema.String),
   layout: Schema.Struct({ hidden: strings }),
+  window: Schema.Struct({ open: Schema.Boolean }),
   grid: Schema.Struct({
     selected,
     sort: Schema.optional(Schema.Struct({ column: Schema.String, dir: Schema.Literals(["asc", "desc"]) })),

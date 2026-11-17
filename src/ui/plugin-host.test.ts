@@ -19,7 +19,7 @@ import type { PickedFile, VaultEntry } from "../model/files"
 import { type ActionMessage, connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
 import { column, gridNode, kanbanNode, publishTree, sliderNode, type UiNode } from "../model/tree"
 import { UiState, uiState } from "../model/ui-state"
-import { bindTree, Booking, Button, Chart, Column, Diagram, FilePicker, Form, Pivot, VaultNode, RichText, Spreadsheet, Todo, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
+import { bindTree, Booking, Button, Chart, Column, Diagram, FilePicker, Form, Pivot, VaultNode, RichText, type Ui, Window, Spreadsheet, Todo, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
 import { Browser, browserWith } from "./browser"
 import { alive, Host } from "./host"
 import { renderPlugin } from "./plugin-host"
@@ -478,4 +478,52 @@ it.live("shows a confirm of the plugin in the page as text, and gives the click 
       ;[...dialog.querySelectorAll("button")].find((button) => button.textContent?.includes("Delete"))!.click()
       expect(yield* Fiber.join(answer)).toBe(true)
     }))
+  }))
+
+it.live("opens a window of the plugin with its child, gives the cross to the plugin, and shows a tooltip", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.height = "200px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const ui = yield* uiState
+      const tree = (open: boolean) =>
+        Column.make({
+          id: "main",
+          children: [
+            Button.make({ id: "help-button", label: "Help", tooltip: "Opens <the> help", size: 40 }),
+            Window.make({ id: "help", title: "Help", open, child: Button.make({ id: "inner", label: "Inside the window" }) })
+          ]
+        })
+      const source = yield* SubscriptionRef.make<Ui>(tree(true))
+      yield* bindTree(source).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, pluginEnd)
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      yield* settle
+      const state = () => Effect.map(ui.full, (full) => (full.state as Record<string, unknown>)["help"])
+      expect(document.querySelector(".dhx_window")?.textContent).toContain("Inside the window")
+      // The window takes no room: the button has the whole frame.
+      expect(element.textContent).not.toContain("Inside the window")
+      // The cross of the user.
+      document.querySelector<HTMLElement>(".dhx_window .dhx_window-header button, .dhx_window-header .dhx_button")!.click()
+      yield* settle
+      expect(document.querySelector(".dhx_window")).toBeNull()
+      expect(yield* state()).toEqual({ open: false })
+      // The plugin opens it again, and closes it.
+      yield* SubscriptionRef.set(source, tree(false))
+      yield* SubscriptionRef.set(source, tree(true))
+      yield* settle
+      expect(document.querySelector(".dhx_window")).not.toBeNull()
+      yield* SubscriptionRef.set(source, tree(false))
+      yield* settle
+      expect(document.querySelector(".dhx_window")).toBeNull()
+      // The tooltip, as text.
+      element.querySelector("button")!.closest<HTMLElement>(".dhxe-node")!.dispatchEvent(new MouseEvent("mouseenter"))
+      yield* Effect.sleep("800 millis")
+      expect(document.body.textContent).toContain("Opens <the> help")
+    }))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))

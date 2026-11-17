@@ -1,7 +1,7 @@
 import { it } from "@effect/vitest"
 import { Effect, Schema, SubscriptionRef } from "effect"
 import { expect } from "vitest"
-import { bindTree, Column, Grid, Kanban, Layout, Row, Sidebar, Slider, Tabbar, type Ui, UiSchema } from "./nodes"
+import { bindTree, Column, Grid, Kanban, Layout, Row, Sidebar, Slider, Tabbar, type Ui, UiSchema, Window } from "./nodes"
 import { TREE_KEY } from "./tree"
 import { UiState, uiState } from "./ui-state"
 
@@ -92,4 +92,23 @@ it.effect("keeps the chosen item of a sidebar and the hidden cells of a layout a
     yield* settle
     expect((yield* state())["side"]).toEqual({ value: "points" })
     expect((yield* state())["frame"]).toEqual({ hidden: [] })
+  }).pipe(Effect.scoped))
+
+it.effect("keeps a window shut until the plugin opens it, and takes the close of the user", () =>
+  Effect.gen(function* () {
+    const ui = yield* uiState
+    const window = (open: boolean) => Column.make({ id: "main", children: [Window.make({ id: "help", title: "Help", open, child: Slider.make({ id: "zoom", value: 2 }) })] })
+    const tree = yield* SubscriptionRef.make<Ui>(window(false))
+    yield* bindTree(tree).pipe(Effect.provideService(UiState, ui))
+    yield* settle
+    const state = () => Effect.map(ui.full, (full) => full.state as Record<string, unknown>)
+    expect((yield* state())["help"]).toEqual({ open: false })
+    // The child is in the document while the window is shut, so it keeps its state.
+    expect((yield* state())["zoom"]).toEqual({ value: 2 })
+    yield* SubscriptionRef.set(tree, window(true))
+    yield* settle
+    expect((yield* state())["help"]).toEqual({ open: true })
+    expect(yield* ui.run("help", "close", [])).toBe(true)
+    yield* settle
+    expect((yield* state())["help"]).toEqual({ open: false })
   }).pipe(Effect.scoped))

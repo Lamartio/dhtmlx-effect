@@ -1,8 +1,8 @@
-import { Effect, Match, Option, Schema, type Scope, Stream, SubscriptionRef } from "effect"
+import { Effect, Fiber, Match, Option, Schema, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteFilePicker, remoteVault, remoteBooking, remotePivot, remoteSpreadsheet, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTodo, remoteTree, remoteValue } from "../model/remote"
+import { type Host as PluginHost, remoteWindow, remoteFilePicker, remoteVault, remoteBooking, remotePivot, remoteSpreadsheet, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTodo, remoteTree, remoteValue } from "../model/remote"
 import { STATES } from "../model/states"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
@@ -20,7 +20,8 @@ import { diagram, diagramEditor } from "./diagram"
 import { richtext } from "./richtext"
 import { booking } from "./booking"
 import { filePicker } from "./filepicker"
-import { Dialogs, layerDialogsLive } from "./dialogs"
+import { openWindow } from "./overlay"
+import { Dialogs, layerDialogsLive, tooltipOn } from "./dialogs"
 import type { AskMessage } from "../model/ui-state"
 import { vault } from "./vault"
 import { MAX_FILE_BYTES } from "../model/files"
@@ -70,6 +71,7 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
       tabbar: (node) => tabsOf(page, node, children),
       sidebar: (node) => sidebarOf(page, node, children),
       layout: (node) => layoutOf(page, node, children),
+      window: (node) => windowOf(page, node, children),
       calendar: (node) => Effect.flatMap(remoteValue<string | undefined>(page, node.id, undefined, STATES.calendar), renderCalendar),
       timepicker: (node) => Effect.flatMap(remoteValue(page, node.id, "09:00", STATES.timepicker), renderTimepicker),
       slider: (node) => Effect.flatMap(remoteValue(page, node.id, node.min ?? 0, STATES.slider), (model) => renderSlider(model, node as never)),
@@ -410,6 +412,39 @@ const sidebarOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "sid
     })
   })
 
+/**
+ * A DHTMLX Window for a window node, open while the model in the plugin says so. The cross of the
+ * user is the action `close`; a close from the plugin closes the window.
+ */
+const windowOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "window" }>, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>) =>
+  Effect.gen(function* () {
+    const refs = yield* childRefs(node, children)
+    const model = yield* remoteWindow(page, node.id)
+    const options = { title: node.title, ...(node.width === undefined ? {} : { width: node.width }), ...(node.height === undefined ? {} : { height: node.height }), ...(node.modal === undefined ? {} : { modal: node.modal }) }
+    let shown: Fiber.Fiber<void> | undefined
+    yield* SubscriptionRef.changes(model.open).pipe(
+      Stream.runForEach((open) =>
+        Effect.gen(function* () {
+          if (open && shown === undefined) {
+            shown = yield* openWindow(options, () => fill(nodePart(page, refs.get(node.child.id)!, "column"))).pipe(
+              // The window closed: by its cross, unless the plugin closed it.
+              Effect.andThen(Effect.suspend(() => {
+                shown = undefined
+                return Effect.flatMap(SubscriptionRef.get(model.open), (still) => (still ? Effect.asVoid(model.close) : Effect.void))
+              })),
+              Effect.forkScoped
+            )
+          } else if (!open && shown !== undefined) {
+            const fiber = shown
+            shown = undefined
+            yield* Fiber.interrupt(fiber)
+          }
+        })),
+      reporting(`The window ${node.id} of the plugin`),
+      Effect.forkScoped
+    )
+  })
+
 /** A Layout for a layout node: a cell for each child, and the hidden cells of the model in the plugin. */
 const layoutOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "layout" }>, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>) =>
   Effect.gen(function* () {
@@ -461,7 +496,11 @@ const nodePart = (page: PluginHost, item: SubscriptionRef.SubscriptionRef<UiNode
           element.style.position = "relative"
           element.style.display = "flex"
           element.style.flexDirection = "column"
-          yield* show(widgetOf(page, node, children).pipe(Effect.provideService(Host, element)))
+          const tooltip = "tooltip" in node ? node.tooltip : undefined
+          yield* show(widgetOf(page, node, children).pipe(
+            Effect.tap(() => (typeof tooltip === "string" ? tooltipOn(element, tooltip) : Effect.void)),
+            Effect.provideService(Host, element)
+          ))
         })),
       reporting(`The node ${Effect.runSync(SubscriptionRef.get(item)).id} of the plugin`),
       Effect.forkScoped

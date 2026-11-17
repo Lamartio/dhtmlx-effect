@@ -19,7 +19,7 @@ import { selectionModel, treeModel } from "./selection"
 import { EventSchema, Rows, TaskSchema } from "./states"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
-  cellsModel, chartNode, clicksNode, datepickerNode, diagramNode, formNode, modelNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
+  cellsModel, chartNode, clicksNode, datepickerNode, diagramNode, formNode, modelNode, windowModel, windowNode, type WindowNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
   WireNodes
 } from "./tree"
 import { partOf, type UiState } from "./ui-state"
@@ -110,8 +110,19 @@ export type Cells = {
     readonly collapsable?: boolean | undefined
   }>
 }
-/** A node of the composed UI: a widget with its data, a frame, tabs, a sidebar or a layout. */
-export type Ui = Widget | Frame | Tabs | Side | Cells
+/** A window of the composed UI, with a child; `open` is whether it is open. */
+export type Win = {
+  readonly _tag: "window"
+  readonly id: string
+  readonly title: string
+  readonly open?: boolean | undefined
+  readonly width?: number | undefined
+  readonly height?: number | undefined
+  readonly modal?: boolean | undefined
+  readonly child: Ui
+}
+/** A node of the composed UI: a widget with its data, a frame, tabs, a sidebar, a layout or a window. */
+export type Ui = Widget | Frame | Tabs | Side | Cells | Win
 
 export const UiSchema: Schema.Codec<Ui> = Schema.Union([
   ...Widgets,
@@ -145,6 +156,16 @@ export const UiSchema: Schema.Codec<Ui> = Schema.Union([
       resizable: Schema.optional(Schema.Boolean),
       collapsable: Schema.optional(Schema.Boolean)
     }))
+  }),
+  Schema.Struct({
+    _tag: Schema.Literal("window"),
+    id: Schema.String,
+    title: Schema.String,
+    open: Schema.optional(Schema.Boolean),
+    width: Schema.optional(Schema.Number),
+    height: Schema.optional(Schema.Number),
+    modal: Schema.optional(Schema.Boolean),
+    child: Schema.suspend((): Schema.Codec<Ui> => UiSchema)
   })
 ]) as never
 
@@ -171,6 +192,9 @@ export const Sidebar = { make: (input: Omit<Side, "_tag">): Side => checked({ _t
 
 /** A DHTMLX Layout with a cell for each child. The plugin hides and shows cells (the actions `hide` and `show`). */
 export const Layout = { make: (input: Omit<Cells, "_tag">): Cells => checked({ _tag: "layout", ...input }) }
+
+/** A DHTMLX Window over the page, with a child node. The plugin opens and closes it with `open`; the cross of the user closes it (the action `close`). */
+export const Window = { make: (input: Omit<Win, "_tag">): Win => checked({ _tag: "window", ...input }) }
 
 /** Tabs, each with a label and a child node. The page draws only the open tab; a click on a tab goes to the plugin. */
 export const Tabbar = {
@@ -306,6 +330,13 @@ export const bindTree = (source: Input<Ui>): Effect.Effect<void, never, UiState 
           const { hidden, cells: _cells, _tag, id, ...config } = node
           const wire: LayoutNode = { _tag: "layout", id: node.id, ...config, cells }
           yield* keep(node.id, stableJson(ids), hidden ?? [], (data) => Effect.flatMap(cellsModel(ids, { hidden: data }), (model) => layoutNode(node.id, model, { ...config, cells })))
+          return wire
+        }
+        if (node._tag === "window") {
+          const { open, child, _tag, ...config } = node
+          // A window takes no room in its frame: it is over the page.
+          const wire: WindowNode = { _tag: "window", ...config, size: 0, child: yield* visit(child, seen) }
+          yield* keep(node.id, stableJson({ ...config, child: child.id }), open ?? false, (data) => Effect.flatMap(windowModel({ open: data }), (model) => windowNode(model, wire)))
           return wire
         }
         if (node._tag === "tabbar") {

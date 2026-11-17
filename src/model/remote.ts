@@ -4,6 +4,7 @@ import { STATES } from "./states"
 import type { Row } from "../core/rows"
 import { CHART_ACTIONS, type ChartModel } from "./chart"
 import { CLICK_ACTIONS, type ClickModel } from "./clicks"
+import { WINDOW_ACTIONS, type WindowModel } from "./tree"
 import { FILE_PICKER_ACTIONS, type FilePickerModel, VAULT_ACTIONS, type VaultEntry, type VaultModel } from "./files"
 import { BOOKING_ACTIONS, type BookingCard, type BookingModel } from "./booking"
 import { PIVOT_ACTIONS, type PivotConfig, type PivotModel } from "./pivot"
@@ -273,3 +274,7 @@ export const remoteVault = (host: Host, id: string) =>
 /** The remote model of a file picker; `picked` stays in the plugin. */
 export const remoteFilePicker = (host: Host, id: string) =>
   Effect.map(remoteModel(host, id, {}, FILE_PICKER_ACTIONS, STATES.filepicker), (model) => ({ ...model, picked: Stream.empty }) as unknown as FilePickerModel)
+
+/** The remote model of a window: whether it is open; `close` is the cross of the user. */
+export const remoteWindow = (host: Host, id: string) =>
+  Effect.map(remoteModel(host, id, { open: false }, WINDOW_ACTIONS, STATES.window), (model) => noActionArgs(model as unknown as Record<string, unknown>, ["close"]) as unknown as WindowModel)
