@@ -1,4 +1,5 @@
 import { Effect, Schema, type Scope, Stream, SubscriptionRef } from "effect"
+import { CHART_ACTIONS, ChartConfigSchema, type ChartModel } from "./chart"
 import { CLICK_ACTIONS, type ClickModel, type MenuItem, MenuItemSchema, ToolbarItemSchema } from "./clicks"
 import { FieldSchema, FORM_ACTIONS, type FormModel } from "./form"
 import { GANTT_ACTIONS, type GanttModel } from "./gantt"
@@ -67,6 +68,8 @@ export const WireNodes = {
   /** A form from a plugin: its fields as data, with their rules (`required`, `pattern`, `min`, `max`). */
   form: Schema.TaggedStruct("form", { id: Schema.String, size: Size, fields: Schema.Array(FieldSchema), submitLabel: Schema.optional(Schema.String) }),
   datepicker: Schema.TaggedStruct("datepicker", { id: Schema.String, size: Size, label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
+  /** A Chart: its config as data (type, series, scales, legend), and its rows as the state of its model. */
+  chart: Schema.TaggedStruct("chart", { id: Schema.String, size: Size, config: ChartConfigSchema }),
   menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, items: Schema.Array(MenuItemSchema) }),
   ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */
@@ -303,6 +306,14 @@ export const datepickerNode = (node: Extract<WidgetNode, { readonly _tag: "datep
   Effect.gen(function* () {
     const ui = yield* UiState
     yield* ui.register(node.id, partOf(model, VALUE_ACTIONS))
+    return node
+  })
+
+/** A Chart in the page, with its model under the id of the node. */
+export const chartNode = (node: Extract<WidgetNode, { readonly _tag: "chart" }>, model: ChartModel) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(node.id, partOf(model, CHART_ACTIONS))
     return node
   })
 

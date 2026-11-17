@@ -11,7 +11,7 @@ import { kanbanModel } from "../model/kanban"
 import { connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
 import { column, gridNode, kanbanNode, publishTree, sliderNode, type UiNode } from "../model/tree"
 import { UiState, uiState } from "../model/ui-state"
-import { bindTree, Button, Column, Form, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
+import { bindTree, Button, Chart, Column, Form, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
 import { Browser, browserWith } from "./browser"
 import { alive, Host } from "./host"
 import { renderPlugin } from "./plugin-host"
@@ -249,6 +249,45 @@ it.live("draws a form of a plugin: a value goes to the plugin, and the error of 
       yield* settle
       expect((yield* state()).errors).toEqual({ title: "Fill this in", code: "Three capitals" })
       expect(element.textContent).toContain("Fill this in")
+    }))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+  }))
+
+it.live("draws a chart of a plugin: a click on the legend goes to the plugin, and the plugin hides a series", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.width = "700px"
+    element.style.height = "400px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const ui = yield* uiState
+      yield* bindTree(Column.make({
+        id: "main",
+        children: [Chart.make({
+          id: "points",
+          config: { type: "bar", series: [{ id: "done", value: "done", color: "#2e7dd1" }, { id: "open", value: "open", color: "#e0a030" }], scales: { bottom: { text: "month" }, left: {} }, legend: { series: ["done", "open"], halign: "right", valign: "top" } },
+          rows: [{ id: "jan", month: "Jan", done: 3, open: 4 }, { id: "feb", month: "Feb", done: 5, open: 2 }]
+        })]
+      })).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, pluginEnd)
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      yield* settle
+      const hidden = () => Effect.map(ui.full, (full) => (full.state as Record<string, { hidden: ReadonlyArray<string> }>)["points"]!.hidden)
+      // A click on the legend item of done, as the user does: it goes to the plugin.
+      const drawn = () => element.querySelector(".dhx_chart")?.innerHTML ?? element.innerHTML
+      const first = drawn()
+      ;[...element.querySelectorAll<Element>(".legend-item")].find((one) => one.textContent?.includes("done"))!.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+      yield* settle
+      expect(yield* hidden()).toEqual(["done"])
+      // The plugin shows done again, and hides open: the Chart in the page follows.
+      yield* ui.run("points", "toggle", ["done"])
+      yield* ui.run("points", "toggle", ["open"])
+      yield* settle
+      expect(yield* hidden()).toEqual(["open"])
+      expect(drawn()).not.toBe(first)
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))

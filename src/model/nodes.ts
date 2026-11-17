@@ -1,4 +1,6 @@
 import { Effect, Exit, Schema, Scope, Stream, SubscriptionRef } from "effect"
+import type { Row as DataRow } from "../core/rows"
+import { chartModel, seriesIds } from "./chart"
 import { clickable, clickModel } from "./clicks"
 import { formModel, rulesCheck } from "./form"
 import { ganttModel } from "./gantt"
@@ -10,7 +12,7 @@ import { schedulerModel } from "./scheduler"
 import { selectionModel, treeModel } from "./selection"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
-  cellsModel, clicksNode, datepickerNode, formNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
+  cellsModel, chartNode, clicksNode, datepickerNode, formNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
   WireNodes
 } from "./tree"
 import type { UiState } from "./ui-state"
@@ -44,6 +46,8 @@ export const Gantt = WireNodes.gantt.mapFields((fields) => ({ ...fields, tasks: 
 export const Scheduler = WireNodes.scheduler.mapFields((fields) => ({ ...fields, events: Schema.Array(EventSchema) }))
 export const Kanban = WireNodes.kanban.mapFields((fields) => ({ ...fields, rows: Rows }))
 export const Form = WireNodes.form.mapFields((fields) => ({ ...fields, values: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) }))
+/** A Chart: its config, its rows, and the series that start hidden. */
+export const Chart = WireNodes.chart.mapFields((fields) => ({ ...fields, rows: Rows, hidden: Schema.optional(Schema.Array(Schema.String)) }))
 export const DatePicker = WireNodes.datepicker.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
 /** A Toolbar, a Button, a Menu and a Ribbon have no data: their items are config, and a click goes to the plugin. */
 export const Toolbar = WireNodes.toolbar
@@ -51,7 +55,7 @@ export const Button = WireNodes.button
 export const Menu = WireNodes.menu
 export const Ribbon = WireNodes.ribbon
 
-const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker] as const
+const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker, Chart] as const
 type Widget = (typeof Widgets)[number]["Type"]
 
 /** A frame of the composed UI, with composed children. */
@@ -162,6 +166,11 @@ export const Tabbar = {
 
 /** The data of a node, which goes into its model; and the node without it, which goes to the page. */
 const split = (node: Widget): { readonly data: unknown; readonly wire: UiNode } => {
+  if (node._tag === "chart") {
+    // A Chart has two parts of data: its rows and its hidden series.
+    const { rows, hidden, ...wire } = node
+    return { data: { rows, hidden: hidden ?? [] }, wire: wire as UiNode }
+  }
   const { value, rows, tasks, events, values, ...wire } = node as Widget & { value?: unknown; rows?: unknown; tasks?: unknown; events?: unknown; values?: unknown }
   return { data: value ?? rows ?? tasks ?? events ?? values, wire: wire as UiNode }
 }
@@ -198,6 +207,18 @@ const modelOf = (node: Widget, data: SubscriptionRef.SubscriptionRef<any>, wire:
         Effect.andThen(formModel(rulesCheck(node.fields), node.fields, { values: data })),
         Effect.flatMap((model) => formNode(wire as never, model))
       )
+    case "chart":
+      return Effect.gen(function* () {
+        // The two parts of the data, each as a ref that follows the data of the node.
+        const part = <A>(key: "rows" | "hidden") =>
+          Effect.gen(function* () {
+            const ref = yield* SubscriptionRef.make<A>((yield* SubscriptionRef.get(data))[key])
+            yield* SubscriptionRef.changes(data).pipe(Stream.runForEach((now: any) => SubscriptionRef.set(ref, now[key])), Effect.forkScoped)
+            return ref
+          })
+        const model = yield* chartModel(seriesIds(node.config), { rows: yield* part<ReadonlyArray<DataRow>>("rows"), hidden: yield* part<ReadonlyArray<string>>("hidden") })
+        return yield* chartNode(wire as never, model)
+      })
     case "datepicker":
       return Effect.flatMap(calendarModel({ value: data }), (model) => datepickerNode(wire as never, model))
     case "toolbar":

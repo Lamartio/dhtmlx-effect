@@ -1,5 +1,6 @@
 import { Effect, PubSub, Ref, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
+import { CHART_ACTIONS, type ChartModel } from "./chart"
 import { CLICK_ACTIONS, type ClickModel } from "./clicks"
 import { FORM_ACTIONS, type FormModel } from "./form"
 import { type GanttModel, GANTT_ACTIONS, type Task, type Zoom } from "./gantt"
@@ -201,4 +202,11 @@ export const remoteForm = (host: Host, id: string) =>
   Effect.map(
     remoteModel(host, id, { values: {} as Readonly<Record<string, unknown>>, errors: {} as Readonly<Record<string, string>> }, FORM_ACTIONS),
     (model) => ({ ...noActionArgs(model as unknown as Record<string, unknown>, ["submit"]), submitted: Stream.empty }) as unknown as FormModel
+  )
+
+/** The remote model of a Chart: its rows and its hidden series; `clicked` stays in the plugin. */
+export const remoteChart = (host: Host, id: string) =>
+  Effect.map(
+    remoteModel(host, id, { rows: [] as ReadonlyArray<Row>, hidden: [] as ReadonlyArray<string> }, CHART_ACTIONS),
+    (model) => ({ ...model, clicked: Stream.empty }) as unknown as ChartModel
   )

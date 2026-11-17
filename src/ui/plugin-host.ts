@@ -2,7 +2,7 @@ import { Effect, Option, Schema, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteClicks, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
+import { type Host as PluginHost, remoteChart, remoteClicks, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
 import { dataCollection, escapeHtml, renderDataView, renderGrid, renderList, renderTree, treeCollection } from "./data"
@@ -13,6 +13,7 @@ import { renderKanban } from "./kanban"
 import { reporting } from "./problems"
 import { renderScheduler } from "./scheduler"
 import { button } from "./button"
+import { chart } from "./chart"
 import { datepicker } from "./datepicker"
 import { renderForm } from "./form"
 import { layout } from "./layout"
@@ -85,6 +86,46 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
           ...(node.label === undefined ? {} : { label: node.label }),
           ...(node.placeholder === undefined ? {} : { placeholder: node.placeholder })
         })
+      case "chart": {
+        const model = yield* remoteChart(page, node.id)
+        const made = yield* chart({ data: yield* dataCollection(model.rows), config: node.config as never })
+        // The series that the Chart hides now; a toggle that came from the plugin is not sent back.
+        const shown = new Set<string>()
+        let applying = false
+        yield* made.toggled.pipe(
+          Stream.runForEach((id) =>
+            Effect.gen(function* () {
+              if (applying) return
+              if (shown.has(id)) shown.delete(id)
+              else shown.add(id)
+              yield* model.toggle(id)
+            })),
+          reporting(`The chart ${node.id}`),
+          Effect.forkScoped
+        )
+        yield* made.clicks.pipe(Stream.runForEach(({ series, row }) => model.click(series, row)), reporting(`The chart ${node.id}`), Effect.forkScoped)
+        yield* SubscriptionRef.changes(model.hidden).pipe(
+          Stream.runForEach((hidden) =>
+            Effect.sync(() => {
+              const wanted = new Set(hidden)
+              for (const id of new Set([...wanted, ...shown])) {
+                if (wanted.has(id) === shown.has(id)) continue
+                applying = true
+                try {
+                  made.chart.getSeries(id)?.toggle()
+                  made.chart.paint()
+                } finally {
+                  applying = false
+                }
+                if (wanted.has(id)) shown.add(id)
+                else shown.delete(id)
+              }
+            })),
+          reporting(`The chart ${node.id}`),
+          Effect.forkScoped
+        )
+        return made
+      }
       case "toolbar": {
         const model = yield* remoteClicks(page, node.id)
         return yield* toolbar(Effect.forEach(node.items, (item) =>

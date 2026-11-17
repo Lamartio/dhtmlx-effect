@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Button, Column, Combobox, DatePicker, Form, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/model/nodes"
+import { Button, Chart, Column, Combobox, DatePicker, Form, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/model/nodes"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },
@@ -50,6 +50,24 @@ export default Layout.make({
         items: [
           { label: "Issues", icon: "dxi dxi-file-outline", child: grid },
           { label: "Board", icon: "dxi dxi-view-column", child: board },
+          {
+            label: "Chart",
+            icon: "dxi dxi-tune",
+            child: Chart.make({
+              id: "points-chart",
+              config: {
+                type: "bar",
+                series: [{ id: "done", value: "done", color: "#2e7dd1", fill: "#2e7dd1" }, { id: "open", value: "open", color: "#e0a030", fill: "#e0a030" }],
+                scales: { bottom: { text: "month" }, left: {} },
+                legend: { series: ["done", "open"], halign: "right", valign: "top" }
+              },
+              rows: [
+                { id: "sep", month: "Sep", done: 4, open: 9 },
+                { id: "oct", month: "Oct", done: 8, open: 6 },
+                { id: "nov", month: "Nov", done: 12, open: 3 }
+              ]
+            })
+          },
           {
             label: "New issue",
             icon: "dxi dxi-calendar",
