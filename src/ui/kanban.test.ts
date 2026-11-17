@@ -71,7 +71,7 @@ it.live("moves a card when the store changes, writes a move back into the store,
     const facts = yield* browserWith(FACTS)
     yield* Effect.scoped(Effect.gen(function* () {
       const rows = yield* SubscriptionRef.make(ISSUES)
-      const { kanban: board, opened } = yield* kanban({ rows, field: "status", columns: COLUMNS, label: (row) => `${row.id} ${row.title}` })
+      const { kanban: board, opened, model } = yield* kanban({ rows, field: "status", columns: COLUMNS, label: (row) => `${row.id} ${row.title}`, history: 50 })
       const clicked = yield* opened.pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
       yield* settle
       // The store moves 080 to doing, and renames 078.
@@ -94,6 +94,8 @@ it.live("moves a card when the store changes, writes a move back into the store,
       card.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }))
       card.click()
       expect(yield* Fiber.join(clicked)).toEqual(["078"])
+      // The drag and the click are the actions of the model; the moves from the store are not sent back.
+      expect((yield* model.recent).filter((entry) => entry._tag === "action").map((entry) => entry.name)).toEqual(["move", "select", "open"])
       yield* setFacts(facts, { dark: true, locale: "de-DE" })
       yield* settle
       expect(host.classList.contains("wx-willow-dark-theme")).toBe(true)

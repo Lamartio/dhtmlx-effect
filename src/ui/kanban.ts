@@ -1,9 +1,10 @@
 import { Kanban, Toolbar, locales } from "@dhtmlx/kanban"
-import { Effect, Option, PubSub, Scope, Stream, SubscriptionRef } from "effect"
+import { Effect, Option, Scope, Stream, SubscriptionRef } from "effect"
 import { diffRows, type Row } from "../core/rows"
 import { Browser, follow } from "./browser"
 import { reporting } from "./problems"
 import { Host, resource } from "./host"
+import { type KanbanModel, kanbanModel, type KanbanModelOptions } from "../model/kanban"
 
 /**
  * The DHTMLX Kanban (the GPL edition, `@dhtmlx/kanban`) as a part of the Effect tree: a board of
@@ -18,19 +19,7 @@ import { Host, resource } from "./host"
 const cardId = (id: string) => `card:${id}`
 const rowId = (id: string | number) => String(id).replace(/^card:/, "")
 
-export type KanbanColumn = {
-  readonly id: string
-  readonly label: string
-  /** The most cards in the column. The header shows the count against it, and the column marks when it has more. */
-  readonly limit?: number
-  /** With a limit: the Kanban refuses a drag into a full column. */
-  readonly strictLimit?: boolean
-  /** The column starts folded. */
-  readonly collapsed?: boolean
-}
-
-/** A swimlane: a row across all the columns. */
-export type KanbanLane = { readonly id: string; readonly label: string; readonly collapsed?: boolean }
+export type { KanbanColumn, KanbanLane } from "../model/kanban"
 
 type KanbanConfig = ConstructorParameters<typeof Kanban>[1]
 
@@ -40,18 +29,12 @@ export type KanbanShape = Omit<NonNullable<KanbanConfig["cardShape"]>, "menu">
 /** The other fields of a card: `priority`, `color`, `progress`, `users`, `start_date`, `end_date`. */
 export type KanbanFields = Omit<KanbanConfig["cards"][number], "id" | "label" | "description">
 
-export type KanbanOptions<R extends Row> = {
-  /** The rows, such as the issues of a tracker. Each one is a card. */
-  readonly rows: SubscriptionRef.SubscriptionRef<ReadonlyArray<R>>
-  /** The field of a row that says its column, such as `status`. A drag to another column changes it. */
-  readonly field: keyof R & string
-  readonly columns: ReadonlyArray<KanbanColumn>
+/** The rows, the field of the column (a drag to another column changes it), the columns and the lanes, as the model takes them; and how a card looks. */
+export type KanbanOptions<R extends Row> = KanbanModelOptions<R> & {
   /** The text on a card. */
   readonly label: (row: R) => string
   /** A second line on a card. */
   readonly description?: (row: R) => string | undefined
-  /** Swimlanes: the field of a row that says its lane, such as `team`. A drag to another lane changes it. */
-  readonly lanes?: { readonly field: keyof R & string; readonly rows: ReadonlyArray<KanbanLane> }
   /** More fields on a card. A field shows only when `shape` turns it on. */
   readonly fields?: (row: R) => KanbanFields
   readonly shape?: KanbanShape
@@ -69,12 +52,15 @@ export const kanbanLanguage = (locale: string): keyof typeof locales => {
  * widgets do). A drag to another column is an event back: it changes `field` of that row in the
  * store. A click on a card gives its id in `opened`, so the app can open it. The Kanban edits nothing of
  * its own: no editor, no new cards, as the store is the truth. The theme and the language follow `Browser`.
+ *
+ * The Kanban runs on its model (`kanbanModel`): a drag is the action `move`, and a click is `select`
+ * and `open`. The selected card of the model does not go back into the Kanban yet.
  */
 export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const opened = yield* Effect.acquireRelease(PubSub.unbounded<string>(), PubSub.shutdown)
+    const model = yield* kanbanModel(options)
     const lane = options.lanes?.field
     const card = (row: R): Readonly<Record<string, unknown>> => {
       const description = options.description?.(row)
@@ -111,7 +97,7 @@ export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
 
     // From the store to the Kanban, as changes. `exec` runs later (it gives a Promise), so a move that
     // came from the store is known by its value, not by a flag.
-    yield* SubscriptionRef.changes(options.rows).pipe(
+    yield* SubscriptionRef.changes(model.rows).pipe(
       Stream.zipWithPrevious,
       Stream.runForEach(([before, after]) =>
         Effect.sync(() => {
@@ -139,24 +125,21 @@ export const kanban = <R extends Row>(options: KanbanOptions<R>) =>
     // From the Kanban to the store: a drag to another column or lane changes that field of the row.
     // The place comes from the card after the move, not from the event: the Kanban refuses a move into a
     // full column with `strictLimit`, and the event comes all the same.
+    // A move that came from the store is the same place again, so the model does nothing with it.
     board.api.on("move-card", ({ id }: { id: string | number }) => {
-      const key = rowId(id)
-      const row = Effect.runSync(SubscriptionRef.get(options.rows)).find((one) => one.id === key)
       const shown = board.api.getCard(id) as Record<string, unknown> | undefined
-      if (row === undefined || shown === undefined) return
-      const moved = { [options.field]: String(shown[options.field]), ...(lane === undefined ? {} : { [lane]: String(shown[lane]) }) }
-      if (Object.entries(moved).every(([field, value]) => String(row[field as keyof R]) === value)) return
-      Effect.runFork(SubscriptionRef.update(options.rows, (all) => all.map((one) => (one.id === key ? { ...one, ...moved } : one))))
+      if (shown === undefined) return
+      Effect.runFork(model.move(rowId(id), String(shown[options.field]), lane === undefined ? undefined : String(shown[lane])))
     })
     board.api.on("select-card", ({ id }: { id: string | number }) => {
-      Effect.runSync(PubSub.publish(opened, rowId(id)))
+      Effect.runSync(model.select(rowId(id)).pipe(Effect.andThen(model.open(rowId(id)))))
     })
 
     // A new theme makes the board again inside the Kanban (`_reset`): the cards stay, as it keeps its store.
     yield* follow(browser.dark, (dark) => board.setTheme({ name: dark ? "willow-dark" : "willow", fonts: false }))
     yield* follow(browser.locale, (tag) => board.setLocale(locales[kanbanLanguage(tag)]))
-    return { kanban: board, opened: Stream.fromPubSub(opened) }
-  }) as Effect.Effect<{ readonly kanban: Kanban; readonly opened: Stream.Stream<string> }, never, Host | Browser | Scope.Scope>
+    return { kanban: board, opened: model.opened, model }
+  }) as Effect.Effect<{ readonly kanban: Kanban; readonly opened: Stream.Stream<string>; readonly model: KanbanModel<R> }, never, Host | Browser | Scope.Scope>
 
 /**
  * The toolbar of a Kanban in the host: a search box and a sort menu over the cards of `board`. It only
