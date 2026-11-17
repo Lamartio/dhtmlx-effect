@@ -42,7 +42,7 @@ The package ships TypeScript source, so use a bundler that reads TypeScript (Vit
 | `dhtmlx-effect/pivot` | `@dhtmlx/pivot` | Pivot table |
 | `dhtmlx-effect/spreadsheet` | `@dhtmlx/spreadsheet` | Spreadsheet |
 | `dhtmlx-effect/vault` | `@dhtmlx/vault` | Vault, the file uploader |
-| `dhtmlx-effect/headless` | `effect` | The models of the widgets, with no DHTMLX: for now Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree and Gantt |
+| `dhtmlx-effect/headless` | `effect` | The models of the widgets, with no DHTMLX: for now Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt and Scheduler |
 | `dhtmlx-effect/storybook` | `@storybook/html-vite` | Stories that are Effect trees, with the Browser layer in the toolbar |
 | `dhtmlx-effect/styles.css` | | The few styles of the wrappers. Load it after the CSS of DHTMLX |
 

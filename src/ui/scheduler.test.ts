@@ -68,7 +68,7 @@ it.live("follows a change in the store, a drag back into the store, and gives a 
     const facts = yield* browserWith(FACTS)
     yield* Effect.scoped(Effect.gen(function* () {
       const events = yield* SubscriptionRef.make(EVENTS)
-      const made = yield* scheduler({ events })
+      const made = yield* scheduler({ events, history: 20 })
       const clicked = yield* made.opened.pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
       yield* settle
       yield* SubscriptionRef.update(events, (all) => [...all.map((one) => (one.id === "075" ? { ...one, text: "Frames done" } : one)), { id: "080", text: "Kanban", start: "2026-11-12T08:00:00Z", end: "2026-11-12T09:00:00Z" }])
@@ -85,6 +85,8 @@ it.live("follows a change in the store, a drag back into the store, and gives a 
       expect((yield* SubscriptionRef.get(events)).find((one) => one.id === "079")?.start).toBe("2026-11-11T14:00:00.000Z")
       made.scheduler.callEvent("onClick", ["080", new MouseEvent("click")])
       expect(yield* Fiber.join(clicked)).toEqual(["080"])
+      // The drag and the click are the actions of the model; the change from the store is not sent back.
+      expect((yield* made.model.recent).filter((entry) => entry._tag === "action").map((entry) => entry.name)).toEqual(["updateEvent", "open"])
     }).pipe(Effect.provideService(Host, host), Effect.provideService(Browser, facts)))
   }))
 

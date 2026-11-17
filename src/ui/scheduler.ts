@@ -1,25 +1,18 @@
 import { scheduler as scheduler_, type SchedulerStatic } from "dhtmlx-scheduler"
-import { Effect, Option, PubSub, Scope, Stream, SubscriptionRef } from "effect"
+import { Effect, Option, Scope, Stream, SubscriptionRef } from "effect"
 import { calendarLocale, dateToDay, dayToDate, instant, zoned } from "../core/form"
 import { diffRows } from "../core/rows"
 import { Browser, follow } from "./browser"
 import { reporting } from "./problems"
 import { Host, resource } from "./host"
+import { type CalendarEvent, type SchedulerModel, type SchedulerView, schedulerModel, type SchedulerModelOptions } from "../model/scheduler"
 
 /**
  * The DHTMLX Scheduler, community edition (GPL-2.0), as a part of the Effect tree:
  * a calendar of events with a start and an end.
  */
 
-/** One event. `start` and `end` are instants (ISO 8601 with a zone); the Scheduler shows them in `Browser.timeZone`. */
-export type CalendarEvent = {
-  readonly id: string
-  readonly text: string
-  readonly start: string
-  readonly end: string
-}
-
-export type SchedulerView = "day" | "week" | "month"
+export type { CalendarEvent, SchedulerView } from "../model/scheduler"
 
 /** The language code of the Scheduler for a BCP 47 tag, as for the Gantt. English when it has none. */
 export const schedulerLanguage = (locale: string): string => {
@@ -76,28 +69,26 @@ const giveBack = (chart: SchedulerStatic, host: HTMLElement) => {
   }
 }
 
-export type SchedulerOptions = {
-  readonly events: SubscriptionRef.SubscriptionRef<ReadonlyArray<CalendarEvent>>
-  readonly view?: SubscriptionRef.SubscriptionRef<SchedulerView>
-  /** The day in view, `YYYY-MM-DD`. With none, today in `Browser.timeZone`. */
-  readonly date?: SubscriptionRef.SubscriptionRef<string>
-}
+/** The events, the view (default `week`) and the day in view, `YYYY-MM-DD` (default: today in `Browser.timeZone`). */
+export type SchedulerOptions = SchedulerModelOptions
 
 /**
  * A DHTMLX Scheduler in the host, with day, week and month views. The events come from the store as
  * changes (as the Gantt does), and a drag or a resize writes the event back. `opened` gives the id of
  * each event that is clicked, so the app can open it. The language, the first day of the week, the clock,
  * the time zone and the skin follow `Browser`, in place.
+ *
+ * The Scheduler runs on its model (`schedulerModel`): a drag, a resize, a click and a change of the
+ * view in the Scheduler are its actions, and the events, the view and the day of the model show in it.
  */
 export const scheduler = (options: SchedulerOptions) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
     const zone = { now: yield* SubscriptionRef.get(browser.timeZone) }
-    const view = options.view ?? (yield* SubscriptionRef.make<SchedulerView>("week"))
     const today = zoned(yield* SubscriptionRef.get(browser.now), zone.now).day
-    const date = options.date ?? (yield* SubscriptionRef.make(today))
-    const opened = yield* Effect.acquireRelease(PubSub.unbounded<string>(), PubSub.shutdown)
+    const model = yield* schedulerModel({ ...options, date: options.date ?? today })
+    const { view, date } = model
     host.classList.add("dhxe-scheduler")
     const chart = yield* resource("scheduler", takeScheduler, (chart) => giveBack(chart, host))
     const wall = dayToDate
@@ -115,7 +106,7 @@ export const scheduler = (options: SchedulerOptions) =>
       }
     }
     const current = { events: [] as ReadonlyArray<CalendarEvent> }
-    yield* SubscriptionRef.changes(options.events).pipe(
+    yield* SubscriptionRef.changes(model.events).pipe(
       Stream.zipWithPrevious,
       Stream.runForEach(([before, after]) =>
         Effect.sync(() => {
@@ -147,17 +138,17 @@ export const scheduler = (options: SchedulerOptions) =>
     yield* listen("onEventChanged", (id: string, event: { text: string; start_date: Date; end_date: Date }) => {
       if (applying) return
       const changed: CalendarEvent = { id: String(id), text: String(event.text), start: fromWall(event.start_date, zone.now), end: fromWall(event.end_date, zone.now) }
-      Effect.runSync(SubscriptionRef.update(options.events, (all) => all.map((one) => (one.id === changed.id ? changed : one))))
+      Effect.runSync(model.updateEvent(changed))
     })
     yield* listen("onClick", (id: string) => {
-      Effect.runSync(PubSub.publish(opened, String(id)))
+      Effect.runSync(model.open(String(id)))
       return false
     })
     yield* listen("onViewChange", (mode: string, shown: Date) => {
       if (applying) return
       const day = dateToDay(shown)
-      if (Effect.runSync(SubscriptionRef.get(view)) !== mode) Effect.runSync(SubscriptionRef.set(view, mode as SchedulerView))
-      if (Effect.runSync(SubscriptionRef.get(date)) !== day) Effect.runSync(SubscriptionRef.set(date, day))
+      if (Effect.runSync(SubscriptionRef.get(view)) !== mode) Effect.runSync(model.showView(mode as SchedulerView))
+      if (Effect.runSync(SubscriptionRef.get(date)) !== day) Effect.runSync(model.showDate(day))
     })
     const showView = () =>
       apply(() => chart.setCurrentView(wall(Effect.runSync(SubscriptionRef.get(date))), Effect.runSync(SubscriptionRef.get(view))))
@@ -189,10 +180,11 @@ export const scheduler = (options: SchedulerOptions) =>
         chart.parse(current.events.map(show))
       })
     })
-    return { scheduler: chart, view, date, opened: Stream.fromPubSub(opened) }
+    return { scheduler: chart, view, date, opened: model.opened, model }
   }) as Effect.Effect<{
     readonly scheduler: SchedulerStatic
     readonly view: SubscriptionRef.SubscriptionRef<SchedulerView>
     readonly date: SubscriptionRef.SubscriptionRef<string>
     readonly opened: Stream.Stream<string>
+    readonly model: SchedulerModel
   }, never, Host | Browser | Scope.Scope>
