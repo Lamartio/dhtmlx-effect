@@ -6,7 +6,8 @@ import { diagramModel, DiagramItemSchema } from "./diagram"
 import { formModel, rulesCheck } from "./form"
 import { ganttModel } from "./gantt"
 import { gridModel } from "./grid"
-import { calendarModel, colorpickerModel, comboboxModel, sliderModel, timepickerModel } from "./inputs"
+import { calendarModel, colorpickerModel, comboboxModel, sliderModel, timepickerModel, VALUE_ACTIONS, valueModel } from "./inputs"
+import { TODO_ACTIONS, TodoDataSchema, todoModel } from "./todo"
 import { kanbanModel } from "./kanban"
 import { type Input, input, stableJson } from "./model"
 import { schedulerModel } from "./scheduler"
@@ -14,10 +15,10 @@ import { selectionModel, treeModel } from "./selection"
 import { EventSchema, Rows, TaskSchema } from "./states"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
-  cellsModel, chartNode, clicksNode, datepickerNode, diagramNode, formNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
+  cellsModel, chartNode, clicksNode, datepickerNode, diagramNode, formNode, modelNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
   WireNodes
 } from "./tree"
-import type { UiState } from "./ui-state"
+import { partOf, type UiState } from "./ui-state"
 
 /**
  * The UI of a plugin, composed from Effect Schema: one Schema for each kind of node, with its config
@@ -44,6 +45,10 @@ export const Kanban = WireNodes.kanban.mapFields((fields) => ({ ...fields, rows:
 export const Form = WireNodes.form.mapFields((fields) => ({ ...fields, values: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) }))
 /** A Chart: its config, its rows, and the series that start hidden. */
 export const Chart = WireNodes.chart.mapFields((fields) => ({ ...fields, rows: Rows, hidden: Schema.optional(Schema.Array(Schema.String)) }))
+/** A RichText editor: its text as data, in its `format`. */
+export const RichText = WireNodes.richtext.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
+/** A To Do List: its tasks, projects and people as data. */
+export const Todo = WireNodes.todo.mapFields((fields) => ({ ...fields, data: TodoDataSchema }))
 /** A Diagram: its kind and config, and its items as data. */
 export const Diagram = WireNodes.diagram.mapFields((fields) => ({ ...fields, items: Schema.Array(DiagramItemSchema) }))
 export const DatePicker = WireNodes.datepicker.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
@@ -53,7 +58,7 @@ export const Button = WireNodes.button
 export const Menu = WireNodes.menu
 export const Ribbon = WireNodes.ribbon
 
-const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker, Chart, Diagram] as const
+const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker, Chart, Diagram, RichText, Todo] as const
 type Widget = (typeof Widgets)[number]["Type"]
 
 /** A frame of the composed UI, with composed children. */
@@ -166,7 +171,7 @@ export const Tabbar = {
 /** The composed Schema of each kind of widget, by its `_tag`. */
 const COMPOSED = {
   calendar: Calendar, timepicker: Timepicker, slider: Slider, colorpicker: Colorpicker, combobox: Combobox, grid: Grid, list: List, dataview: DataView, tree: Tree,
-  gantt: Gantt, scheduler: Scheduler, kanban: Kanban, toolbar: Toolbar, button: Button, menu: Menu, ribbon: Ribbon, form: Form, datepicker: DatePicker, chart: Chart, diagram: Diagram
+  gantt: Gantt, scheduler: Scheduler, kanban: Kanban, toolbar: Toolbar, button: Button, menu: Menu, ribbon: Ribbon, form: Form, datepicker: DatePicker, chart: Chart, diagram: Diagram, richtext: RichText, todo: Todo
 } as const satisfies { readonly [K in Widget["_tag"]]: { readonly fields: object } }
 
 /** The fields of a kind that are data, not config: the fields of its composed Schema that its wire Schema has not. */
@@ -217,6 +222,8 @@ const modelOf = (node: Widget, data: SubscriptionRef.SubscriptionRef<any>, wire:
         Effect.flatMap((model) => formNode(wire as never, model))
       ),
     diagram: () => Effect.flatMap(diagramModel({ items: data }), (model) => diagramNode(wire as never, model)),
+    richtext: () => Effect.flatMap(valueModel({ value: data }, ""), (model) => modelNode(wire as never, partOf(model, VALUE_ACTIONS))),
+    todo: () => Effect.flatMap(todoModel({ data }), (model) => modelNode(wire as never, partOf(model, TODO_ACTIONS))),
     datepicker: () => Effect.flatMap(calendarModel({ value: data }), (model) => datepickerNode(wire as never, model)),
     chart: (node) =>
       Effect.gen(function* () {

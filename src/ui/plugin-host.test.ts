@@ -5,6 +5,8 @@ import { expect } from "vitest"
 import "dhx-suite/codebase/suite.min.css"
 import "@dhtmlx/kanban/dist/kanban.css"
 import "@dhtmlx/diagram/codebase/diagram.min.css"
+import "@dhtmlx/richtext/dist/richtext.css"
+import "@dhtmlx/todolist/dist/todo.css"
 import "../styles.css"
 import { gridModel } from "../model/grid"
 import { sliderModel } from "../model/inputs"
@@ -12,7 +14,7 @@ import { kanbanModel } from "../model/kanban"
 import { connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
 import { column, gridNode, kanbanNode, publishTree, sliderNode, type UiNode } from "../model/tree"
 import { UiState, uiState } from "../model/ui-state"
-import { bindTree, Button, Chart, Column, Diagram, Form, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
+import { bindTree, Button, Chart, Column, Diagram, Form, RichText, Todo, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
 import { Browser, browserWith } from "./browser"
 import { alive, Host } from "./host"
 import { renderPlugin } from "./plugin-host"
@@ -320,6 +322,40 @@ it.live("draws a diagram of a plugin, and an edit in the plugin shows in the pag
       yield* settle
       expect(element.textContent).toContain("Plan it")
       expect(element.textContent).not.toContain("Work")
+    }))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+  }))
+
+it.live("draws a rich text and a to do list of a plugin, and a change in the plugin shows in the page", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.width = "800px"
+    element.style.height = "600px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const ui = yield* uiState
+      yield* bindTree(Column.make({
+        id: "main",
+        children: [
+          RichText.make({ id: "notes", format: "markdown", value: "First **notes**" }),
+          Todo.make({ id: "tasks", data: { tasks: [{ id: "plan", text: "Plan the week" }] } })
+        ]
+      })).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, pluginEnd)
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      yield* settle
+      expect(element.textContent).toContain("First notes")
+      expect(element.textContent).toContain("Plan the week")
+      expect(yield* ui.run("notes", "set", ["Other notes"])).toBe(true)
+      expect(yield* ui.run("tasks", "edit", [{ tasks: [{ id: "ship", text: "Ship it" }] }])).toBe(true)
+      expect(yield* ui.run("tasks", "edit", [{ tasks: [{ id: "x", text: "X", parent: "nothing" }] }])).toBe(false)
+      yield* settle
+      expect(element.textContent).toContain("Other notes")
+      expect(element.textContent).toContain("Ship it")
+      expect(element.textContent).not.toContain("Plan the week")
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))

@@ -11,7 +11,7 @@ import { type KanbanColumn, type KanbanLane, KANBAN_ACTIONS, type KanbanModel } 
 import type { Row } from "../core/rows"
 import { SCHEDULER_ACTIONS, type SchedulerModel } from "./scheduler"
 import { SELECTION_ACTIONS, type SelectionModel, TREE_ACTIONS, type TreeModel } from "./selection"
-import { partOf, UiState } from "./ui-state"
+import { type Part, partOf, UiState } from "./ui-state"
 
 /**
  * The UI as data, made in the plugin: a tree of nodes, each with its kind and its config. The state
@@ -79,6 +79,17 @@ export const WireNodes = {
     editor: Schema.optional(Schema.Boolean),
     config: Schema.optional(Schema.Record(Schema.String, Schema.Unknown))
   }),
+  /** A RichText editor: its format and its bars as config, its text as the state of a value model. */
+  richtext: Schema.TaggedStruct("richtext", {
+    id: Schema.String,
+    size: Size,
+    format: Schema.optional(Schema.Literals(["html", "markdown", "text"])),
+    toolbar: Schema.optional(Schema.Boolean),
+    menubar: Schema.optional(Schema.Boolean),
+    readOnly: Schema.optional(Schema.Boolean)
+  }),
+  /** A To Do List: its tasks, projects and people as the state of its model. */
+  todo: Schema.TaggedStruct("todo", { id: Schema.String, size: Size, readonly: Schema.optional(Schema.Boolean) }),
   menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, items: Schema.Array(MenuItemSchema) }),
   ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */
@@ -318,6 +329,14 @@ export const chartNode = (node: Extract<WidgetNode, { readonly _tag: "chart" }>,
   Effect.gen(function* () {
     const ui = yield* UiState
     yield* ui.register(node.id, partOf(model, CHART_ACTIONS))
+    return node
+  })
+
+/** A node in the page, with its model under the id of the node. */
+export const modelNode = <N extends WidgetNode>(node: N, part: Part) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(node.id, part)
     return node
   })
 

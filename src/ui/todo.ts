@@ -4,30 +4,9 @@ import { Browser, follow } from "./browser"
 import { Host, resource } from "./host"
 import { reportedCallback } from "./problems"
 import { wxClear, wxThemeClass } from "./wx"
+import type { TodoData, TodoProject, TodoTask } from "../model/todo"
 
-/** One task. A task with a `parent` is a subtask; `project` puts it in a project. */
-export type TodoTask = {
-  readonly id: string
-  readonly text: string
-  readonly checked?: boolean
-  readonly parent?: string | null
-  readonly project?: string | null
-  readonly collapsed?: boolean
-  readonly priority?: number | null
-  readonly assigned?: ReadonlyArray<string>
-  readonly due_date?: string | Date
-  readonly [key: string]: unknown
-}
-
-export type TodoProject = { readonly id: string; readonly label: string }
-export type TodoUser = { readonly id: string; readonly label: string; readonly avatar?: string; readonly color?: string }
-
-/** What the list shows: the tasks, and the projects and the people that a task can name. */
-export type TodoData = {
-  readonly tasks: ReadonlyArray<TodoTask>
-  readonly projects?: ReadonlyArray<TodoProject>
-  readonly users?: ReadonlyArray<TodoUser>
-}
+export type { TodoData, TodoProject, TodoTask, TodoUser } from "../model/todo"
 
 /** The actions of a person that change the tasks or the projects. */
 const CHANGES = [

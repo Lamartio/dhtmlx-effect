@@ -2,6 +2,8 @@
 import "dhx-suite/codebase/suite.min.css"
 import "@dhtmlx/kanban/dist/kanban.css"
 import "@dhtmlx/diagram/codebase/diagram.min.css"
+import "@dhtmlx/richtext/dist/richtext.css"
+import "@dhtmlx/todolist/dist/todo.css"
 import "../src/styles.css"
 import { Effect } from "effect"
 import { connectHost, layerBrowserLive, mount, openPlugin, renderPlugin } from "../src/host"

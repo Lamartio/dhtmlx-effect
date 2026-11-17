@@ -4,6 +4,7 @@ import { STATES } from "./states"
 import type { Row } from "../core/rows"
 import { CHART_ACTIONS, type ChartModel } from "./chart"
 import { CLICK_ACTIONS, type ClickModel } from "./clicks"
+import { TODO_ACTIONS, type TodoData, type TodoModel } from "./todo"
 import { DIAGRAM_ACTIONS, type DiagramModel, type Item } from "./diagram"
 import { FORM_ACTIONS, type FormModel } from "./form"
 import { type GanttModel, GANTT_ACTIONS, type Task, type Zoom } from "./gantt"
@@ -232,3 +233,7 @@ export const remoteDiagram = (host: Host, id: string) =>
     remoteModel(host, id, { items: [] as ReadonlyArray<Item>, selected: undefined as string | undefined }, DIAGRAM_ACTIONS, STATES.diagram),
     (model) => ({ ...model, clicked: Stream.empty }) as unknown as DiagramModel
   )
+
+/** The remote model of a To Do List. */
+export const remoteTodo = (host: Host, id: string) =>
+  Effect.map(remoteModel(host, id, { data: { tasks: [] } as TodoData }, TODO_ACTIONS, STATES.todo), (model) => model as unknown as TodoModel)

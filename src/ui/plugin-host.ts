@@ -2,7 +2,7 @@ import { Effect, Match, Option, Schema, type Scope, Stream, SubscriptionRef } fr
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
+import { type Host as PluginHost, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTodo, remoteTree, remoteValue } from "../model/remote"
 import { STATES } from "../model/states"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
@@ -17,6 +17,8 @@ import { button } from "./button"
 import { chart } from "./chart"
 import { datepicker } from "./datepicker"
 import { diagram, diagramEditor } from "./diagram"
+import { richtext } from "./richtext"
+import { todo } from "./todo"
 import { renderForm } from "./form"
 import { layout } from "./layout"
 import { gridContextMenu, menu, ribbon } from "./menus"
@@ -100,6 +102,17 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
           })
           yield* made.clicks.pipe(Stream.runForEach((id) => model.click(id)), reporting(`The diagram ${node.id}`), Effect.forkScoped)
           return made
+        }),
+      richtext: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteValue(page, node.id, "", STATES.richtext)
+          const options = Object.fromEntries(Object.entries({ format: node.format, toolbar: node.toolbar, menubar: node.menubar, readOnly: node.readOnly }).filter(([, value]) => value !== undefined))
+          return yield* richtext({ ...options, value: yield* bridge(model.value, model.set) })
+        }),
+      todo: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteTodo(page, node.id)
+          return yield* todo({ data: yield* bridge(model.data, model.edit), ...(node.readonly === undefined ? {} : { readonly: node.readonly }) })
         }),
       chart: (node) =>
         Effect.gen(function* () {

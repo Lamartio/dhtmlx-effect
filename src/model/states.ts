@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { DiagramItemSchema } from "./diagram"
 import { ZOOM_LEVELS } from "./gantt"
+import { TodoDataSchema } from "./todo"
 
 /**
  * The state of each kind of node, as it is in the document: the Schema that the page checks after
@@ -47,6 +48,8 @@ export const STATES = {
   form: Schema.Struct({ values: Schema.Record(Schema.String, Schema.Unknown), errors: Schema.Record(Schema.String, Schema.String) }),
   chart: Schema.Struct({ rows: Rows, hidden: strings }),
   diagram: Schema.Struct({ items: Schema.Array(DiagramItemSchema), selected }),
+  richtext: value(Schema.String),
+  todo: Schema.Struct({ data: TodoDataSchema }),
   toolbar: none,
   button: none,
   menu: none,
