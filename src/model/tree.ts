@@ -132,21 +132,16 @@ export type LayoutNode = {
 export type UiNode = WidgetNode | FrameNode | TabbarNode | SidebarNode | LayoutNode
 
 /** The children of a node: of a frame, of tabs, of a sidebar, of a layout. A widget has none. */
-export const childrenOf = (node: UiNode): ReadonlyArray<UiNode> => {
-  switch (node._tag) {
-    case "column":
-    case "row":
-      return node.children
-    case "tabbar":
-      return node.tabs.map((tab) => tab.child)
-    case "sidebar":
-      return node.items.map((item) => item.child)
-    case "layout":
-      return node.cells.map((cell) => cell.child)
-    default:
-      return []
-  }
-}
+export const childrenOf = (node: UiNode): ReadonlyArray<UiNode> =>
+  "children" in node
+    ? node.children
+    : node._tag === "tabbar"
+      ? node.tabs.map((tab) => tab.child)
+      : node._tag === "sidebar"
+        ? node.items.map((item) => item.child)
+        : node._tag === "layout"
+          ? node.cells.map((cell) => cell.child)
+          : []
 
 export const UiNodeSchema: Schema.Codec<UiNode> = Schema.Union([
   WidgetNodeSchema,

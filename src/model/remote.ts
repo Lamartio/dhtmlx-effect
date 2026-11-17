@@ -1,4 +1,6 @@
-import { Effect, PubSub, Ref, type Scope, Stream, SubscriptionRef } from "effect"
+import { Cause, Effect, PubSub, Ref, Schema, type Scope, Stream, SubscriptionRef } from "effect"
+import { Problems } from "../ui/problems"
+import { STATES } from "./states"
 import type { Row } from "../core/rows"
 import { CHART_ACTIONS, type ChartModel } from "./chart"
 import { CLICK_ACTIONS, type ClickModel } from "./clicks"
@@ -111,8 +113,13 @@ export const connectHost = (channel: Channel<PluginMessage, HostMessage>): Effec
  * value changes. When the plugin refuses an action of this part, each ref gives its value again, so a
  * renderer draws it back.
  */
-export const remoteModel = <Fields extends Record<string, unknown>>(host: Host, id: string, fields: Fields, actions: ReadonlyArray<string>) =>
+export const remoteModel = <Fields extends Record<string, unknown>>(host: Host, id: string, fields: Fields, actions: ReadonlyArray<string>, state?: Schema.Top) =>
   Effect.gen(function* () {
+    const problems = yield* Problems
+    // The state of the part as its Schema takes it; a state that does not pass is reported, and the
+    // refs keep their last values.
+    const valid = state === undefined ? () => true : Schema.is(state as never)
+    let last: unknown = undefined
     const valueOf = (document: Readonly<Record<string, unknown>>, name: string) => {
       const part = document[id] as Record<string, unknown> | undefined
       return part?.[name] === undefined ? fields[name] : part[name]
@@ -122,6 +129,13 @@ export const remoteModel = <Fields extends Record<string, unknown>>(host: Host, 
     for (const name of Object.keys(fields)) (refs as Record<string, unknown>)[name] = yield* SubscriptionRef.make(valueOf(now, name))
     const all = Object.entries(refs) as Array<[string, SubscriptionRef.SubscriptionRef<unknown>]>
     yield* SubscriptionRef.changes(host.document).pipe(
+      Stream.filter((document) => {
+        const part = document[id]
+        if (part === undefined || valid(part)) return true
+        if (part !== last) Effect.runFork(problems.report(`The state of ${id} from the plugin`, Cause.fail(new Error(`It does not pass the Schema of its kind: ${stableJson(part).slice(0, 200)}`))))
+        last = part
+        return false
+      }),
       Stream.runForEach((document) =>
         Effect.forEach(all, ([name, ref]) =>
           Effect.gen(function* () {
@@ -154,59 +168,59 @@ const noActionArgs = (model: Record<string, unknown>, names: ReadonlyArray<strin
   return model
 }
 
-export const remoteValue = <A>(host: Host, id: string, initial: A) =>
-  Effect.map(remoteModel(host, id, { value: initial }, VALUE_ACTIONS), (model) => model as unknown as ValueModel<A>)
+export const remoteValue = <A>(host: Host, id: string, initial: A, state?: Schema.Top) =>
+  Effect.map(remoteModel(host, id, { value: initial }, VALUE_ACTIONS, state), (model) => model as unknown as ValueModel<A>)
 
 export const remoteGrid = (host: Host, id: string) =>
   Effect.map(
-    remoteModel(host, id, { selected: undefined as string | undefined, sort: undefined as GridSort | undefined, filters: {} as Readonly<Record<string, string>>, rows: [] as ReadonlyArray<Row> }, GRID_ACTIONS),
+    remoteModel(host, id, { selected: undefined as string | undefined, sort: undefined as GridSort | undefined, filters: {} as Readonly<Record<string, string>>, rows: [] as ReadonlyArray<Row> }, GRID_ACTIONS, STATES.grid),
     (model) => ({ ...model, edits: Stream.empty, chosen: Stream.empty }) as unknown as GridModel & { readonly rows: SubscriptionRef.SubscriptionRef<ReadonlyArray<Row>> }
   )
 
 export const remoteSelection = (host: Host, id: string) =>
   Effect.map(
-    remoteModel(host, id, { selected: undefined as string | undefined, rows: [] as ReadonlyArray<Row> }, SELECTION_ACTIONS),
+    remoteModel(host, id, { selected: undefined as string | undefined, rows: [] as ReadonlyArray<Row> }, SELECTION_ACTIONS, STATES.list),
     (model) => model as unknown as SelectionModel & { readonly rows: SubscriptionRef.SubscriptionRef<ReadonlyArray<Row>> }
   )
 
 export const remoteTree = (host: Host, id: string) =>
   Effect.map(
-    remoteModel(host, id, { selected: undefined as string | undefined, expanded: [] as ReadonlyArray<string>, rows: [] as ReadonlyArray<Row> }, TREE_ACTIONS),
+    remoteModel(host, id, { selected: undefined as string | undefined, expanded: [] as ReadonlyArray<string>, rows: [] as ReadonlyArray<Row> }, TREE_ACTIONS, STATES.tree),
     (model) => model as unknown as TreeModel & { readonly rows: SubscriptionRef.SubscriptionRef<ReadonlyArray<Row>> }
   )
 
 export const remoteGantt = (host: Host, id: string) =>
   Effect.map(
-    remoteModel(host, id, { zoom: "day" as Zoom, tasks: [] as ReadonlyArray<Task> }, GANTT_ACTIONS),
+    remoteModel(host, id, { zoom: "day" as Zoom, tasks: [] as ReadonlyArray<Task> }, GANTT_ACTIONS, STATES.gantt),
     (model) => noActionArgs(model as unknown as Record<string, unknown>, ["zoomIn", "zoomOut"]) as unknown as GanttModel
   )
 
 export const remoteScheduler = (host: Host, id: string, today: string) =>
   Effect.map(
-    remoteModel(host, id, { view: "week" as SchedulerView, date: today, events: [] as ReadonlyArray<CalendarEvent> }, SCHEDULER_ACTIONS),
+    remoteModel(host, id, { view: "week" as SchedulerView, date: today, events: [] as ReadonlyArray<CalendarEvent> }, SCHEDULER_ACTIONS, STATES.scheduler),
     (model) => ({ ...model, opened: Stream.empty }) as unknown as SchedulerModel
   )
 
 export const remoteKanban = <R extends Row>(host: Host, id: string) =>
   Effect.map(
-    remoteModel(host, id, { selected: undefined as string | undefined, rows: [] as ReadonlyArray<R> }, KANBAN_ACTIONS),
+    remoteModel(host, id, { selected: undefined as string | undefined, rows: [] as ReadonlyArray<R> }, KANBAN_ACTIONS, STATES.kanban),
     (model) => ({ ...model, opened: Stream.empty }) as unknown as KanbanModel<R>
   )
 
 /** The remote model of a Toolbar, a Button, a Menu or a Ribbon: only `click`, which goes to the plugin. */
 export const remoteClicks = (host: Host, id: string) =>
-  Effect.map(remoteModel(host, id, {}, CLICK_ACTIONS), (model) => ({ ...model, clicked: Stream.empty }) as unknown as ClickModel)
+  Effect.map(remoteModel(host, id, {}, CLICK_ACTIONS, STATES.button), (model) => ({ ...model, clicked: Stream.empty }) as unknown as ClickModel)
 
 /** The remote model of a form: its values and the errors to show; `submit` takes no arguments. */
 export const remoteForm = (host: Host, id: string) =>
   Effect.map(
-    remoteModel(host, id, { values: {} as Readonly<Record<string, unknown>>, errors: {} as Readonly<Record<string, string>> }, FORM_ACTIONS),
+    remoteModel(host, id, { values: {} as Readonly<Record<string, unknown>>, errors: {} as Readonly<Record<string, string>> }, FORM_ACTIONS, STATES.form),
     (model) => ({ ...noActionArgs(model as unknown as Record<string, unknown>, ["submit"]), submitted: Stream.empty }) as unknown as FormModel
   )
 
 /** The remote model of a Chart: its rows and its hidden series; `clicked` stays in the plugin. */
 export const remoteChart = (host: Host, id: string) =>
   Effect.map(
-    remoteModel(host, id, { rows: [] as ReadonlyArray<Row>, hidden: [] as ReadonlyArray<string> }, CHART_ACTIONS),
+    remoteModel(host, id, { rows: [] as ReadonlyArray<Row>, hidden: [] as ReadonlyArray<string> }, CHART_ACTIONS, STATES.chart),
     (model) => ({ ...model, clicked: Stream.empty }) as unknown as ChartModel
   )

@@ -1,8 +1,9 @@
-import { Effect, Option, Schema, Stream, SubscriptionRef } from "effect"
+import { Effect, Match, Option, Schema, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
 import { type Host as PluginHost, remoteChart, remoteClicks, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
+import { STATES } from "../model/states"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
 import { dataCollection, escapeHtml, renderDataView, renderGrid, renderList, renderTree, treeCollection } from "./data"
@@ -41,161 +42,167 @@ const fieldsTemplate = (fields: ReadonlyArray<string>) => (item: Record<string, 
 /** The widget of one node, in the host of the node. */
 const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>): Widget =>
   Effect.gen(function* () {
-    switch (node._tag) {
-      case "column":
-      case "row": {
+    /** A column or a row: a flex frame with its children keyed by id. */
+    const frame = (tag: "column" | "row") =>
+      Effect.gen(function* () {
         const host = yield* Host
         host.style.display = "flex"
-        host.style.flexDirection = node._tag
+        host.style.flexDirection = tag
         host.style.minHeight = "0"
         host.style.minWidth = "0"
-        return yield* keyed(children, (one) => one.id, (one) => nodePart(page, one, node._tag))
-      }
-      case "tabbar":
-        return yield* tabsOf(page, node, children)
-      case "sidebar":
-        return yield* sidebarOf(page, node, children)
-      case "layout":
-        return yield* layoutOf(page, node, children)
-      case "calendar":
-        return yield* renderCalendar(yield* remoteValue<string | undefined>(page, node.id, undefined))
-      case "timepicker":
-        return yield* renderTimepicker(yield* remoteValue(page, node.id, "09:00"))
-      case "slider":
-        return yield* renderSlider(yield* remoteValue(page, node.id, node.min ?? 0), node as never)
-      case "colorpicker":
-        return yield* renderColorpicker(yield* remoteValue(page, node.id, "#2e7dd1"))
-      case "combobox":
-        return yield* renderCombobox(yield* remoteValue<string | undefined>(page, node.id, undefined), node as never)
-      case "grid": {
-        const model = yield* remoteGrid(page, node.id)
-        const made = yield* renderGrid(model, { data: yield* dataCollection(model.rows), columns: node.columns as never })
-        const menu = node.menu
-        if (menu !== undefined && menu.length > 0) {
-          const choices = yield* gridContextMenu(made.grid, () => menu as never)
-          yield* choices.pipe(Stream.runForEach(({ row, choice }) => model.choose(row, choice)), reporting(`The menu of ${node.id}`), Effect.forkScoped)
-        }
-        return made
-      }
-      case "form": {
-        return yield* renderForm(yield* remoteForm(page, node.id), { fields: node.fields as never, ...(node.submitLabel === undefined ? {} : { submitLabel: node.submitLabel }) })
-      }
-      case "datepicker":
-        return yield* datepicker({
-          value: yield* chosen<string | undefined>(page, node.id, undefined),
-          ...(node.label === undefined ? {} : { label: node.label }),
-          ...(node.placeholder === undefined ? {} : { placeholder: node.placeholder })
-        })
-      case "chart": {
-        const model = yield* remoteChart(page, node.id)
-        const made = yield* chart({ data: yield* dataCollection(model.rows), config: node.config as never })
-        // The series that the Chart hides now; a toggle that came from the plugin is not sent back.
-        const shown = new Set<string>()
-        let applying = false
-        yield* made.toggled.pipe(
-          Stream.runForEach((id) =>
-            Effect.gen(function* () {
-              if (applying) return
-              if (shown.has(id)) shown.delete(id)
-              else shown.add(id)
-              yield* model.toggle(id)
-            })),
-          reporting(`The chart ${node.id}`),
-          Effect.forkScoped
-        )
-        yield* made.clicks.pipe(Stream.runForEach(({ series, row }) => model.click(series, row)), reporting(`The chart ${node.id}`), Effect.forkScoped)
-        yield* SubscriptionRef.changes(model.hidden).pipe(
-          Stream.runForEach((hidden) =>
-            Effect.sync(() => {
-              const wanted = new Set(hidden)
-              for (const id of new Set([...wanted, ...shown])) {
-                if (wanted.has(id) === shown.has(id)) continue
-                applying = true
-                try {
-                  made.chart.getSeries(id)?.toggle()
-                  made.chart.paint()
-                } finally {
-                  applying = false
+        return yield* keyed(children, (one) => one.id, (one) => nodePart(page, one, tag))
+      })
+    // Each kind of node has its widget here: Match.valueTags makes a kind that is missing a type error.
+    return yield* Match.valueTags(node, {
+      column: () => frame("column"),
+      row: () => frame("row"),
+      tabbar: (node) => tabsOf(page, node, children),
+      sidebar: (node) => sidebarOf(page, node, children),
+      layout: (node) => layoutOf(page, node, children),
+      calendar: (node) => Effect.flatMap(remoteValue<string | undefined>(page, node.id, undefined, STATES.calendar), renderCalendar),
+      timepicker: (node) => Effect.flatMap(remoteValue(page, node.id, "09:00", STATES.timepicker), renderTimepicker),
+      slider: (node) => Effect.flatMap(remoteValue(page, node.id, node.min ?? 0, STATES.slider), (model) => renderSlider(model, node as never)),
+      colorpicker: (node) => Effect.flatMap(remoteValue(page, node.id, "#2e7dd1", STATES.colorpicker), renderColorpicker),
+      combobox: (node) => Effect.flatMap(remoteValue<string | undefined>(page, node.id, undefined, STATES.combobox), (model) => renderCombobox(model, node as never)),
+      grid: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteGrid(page, node.id)
+          const made = yield* renderGrid(model, { data: yield* dataCollection(model.rows), columns: node.columns as never })
+          const menu = node.menu
+          if (menu !== undefined && menu.length > 0) {
+            const choices = yield* gridContextMenu(made.grid, () => menu as never)
+            yield* choices.pipe(Stream.runForEach(({ row, choice }) => model.choose(row, choice)), reporting(`The menu of ${node.id}`), Effect.forkScoped)
+          }
+          return made
+        }),
+      form: (node) => Effect.flatMap(remoteForm(page, node.id), (model) => renderForm(model, { fields: node.fields as never, ...(node.submitLabel === undefined ? {} : { submitLabel: node.submitLabel }) })),
+      datepicker: (node) =>
+        Effect.gen(function* () {
+          return yield* datepicker({
+            value: yield* chosen<string | undefined>(page, node.id, undefined),
+            ...(node.label === undefined ? {} : { label: node.label }),
+            ...(node.placeholder === undefined ? {} : { placeholder: node.placeholder })
+          })
+        }),
+      chart: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteChart(page, node.id)
+          const made = yield* chart({ data: yield* dataCollection(model.rows), config: node.config as never })
+          // The series that the Chart hides now; a toggle that came from the plugin is not sent back.
+          const shown = new Set<string>()
+          let applying = false
+          yield* made.toggled.pipe(
+            Stream.runForEach((id) =>
+              Effect.gen(function* () {
+                if (applying) return
+                if (shown.has(id)) shown.delete(id)
+                else shown.add(id)
+                yield* model.toggle(id)
+              })),
+            reporting(`The chart ${node.id}`),
+            Effect.forkScoped
+          )
+          yield* made.clicks.pipe(Stream.runForEach(({ series, row }) => model.click(series, row)), reporting(`The chart ${node.id}`), Effect.forkScoped)
+          yield* SubscriptionRef.changes(model.hidden).pipe(
+            Stream.runForEach((hidden) =>
+              Effect.sync(() => {
+                const wanted = new Set(hidden)
+                for (const id of new Set([...wanted, ...shown])) {
+                  if (wanted.has(id) === shown.has(id)) continue
+                  applying = true
+                  try {
+                    made.chart.getSeries(id)?.toggle()
+                    made.chart.paint()
+                  } finally {
+                    applying = false
+                  }
+                  if (wanted.has(id)) shown.add(id)
+                  else shown.delete(id)
                 }
-                if (wanted.has(id)) shown.add(id)
-                else shown.delete(id)
-              }
-            })),
-          reporting(`The chart ${node.id}`),
-          Effect.forkScoped
-        )
-        return made
-      }
-      case "toolbar": {
-        const model = yield* remoteClicks(page, node.id)
-        return yield* toolbar(Effect.forEach(node.items, (item) =>
-          Effect.gen(function* () {
-            if ("title" in item) return void (yield* toolbarTitle(item.title))
-            if ("spacer" in item) return void (yield* toolbarSpacer)
-            if ("separator" in item) return void (yield* toolbarSeparator)
-            const clicks = yield* toolbarButton({
-              ...(item.label === undefined ? {} : { label: item.label }),
-              ...(item.icon === undefined ? {} : { icon: item.icon }),
-              ...(item.tooltip === undefined ? {} : { tooltip: item.tooltip }),
-              ...(item.color === undefined ? {} : { color: item.color }),
-              ...(item.view === undefined ? {} : { view: item.view })
-            })
-            yield* clicks.pipe(Stream.runForEach(() => model.click(item.id)), reporting(`The toolbar ${node.id}`), Effect.forkScoped)
-          }), { discard: true }))
-      }
-      case "button": {
-        const model = yield* remoteClicks(page, node.id)
-        const made = yield* button({
-          label: node.label,
-          ...(node.color === undefined ? {} : { color: node.color }),
-          ...(node.view === undefined ? {} : { view: node.view }),
-          ...(node.disabled === true ? { disabled: yield* SubscriptionRef.make(true) } : {})
+              })),
+            reporting(`The chart ${node.id}`),
+            Effect.forkScoped
+          )
+          return made
+        }),
+      toolbar: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteClicks(page, node.id)
+          return yield* toolbar(Effect.forEach(node.items, (item) =>
+            Effect.gen(function* () {
+              if ("title" in item) return void (yield* toolbarTitle(item.title))
+              if ("spacer" in item) return void (yield* toolbarSpacer)
+              if ("separator" in item) return void (yield* toolbarSeparator)
+              const clicks = yield* toolbarButton({
+                ...(item.label === undefined ? {} : { label: item.label }),
+                ...(item.icon === undefined ? {} : { icon: item.icon }),
+                ...(item.tooltip === undefined ? {} : { tooltip: item.tooltip }),
+                ...(item.color === undefined ? {} : { color: item.color }),
+                ...(item.view === undefined ? {} : { view: item.view })
+              })
+              yield* clicks.pipe(Stream.runForEach(() => model.click(item.id)), reporting(`The toolbar ${node.id}`), Effect.forkScoped)
+            }), { discard: true }))
+        }),
+      button: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteClicks(page, node.id)
+          const made = yield* button({
+            label: node.label,
+            ...(node.color === undefined ? {} : { color: node.color }),
+            ...(node.view === undefined ? {} : { view: node.view }),
+            ...(node.disabled === true ? { disabled: yield* SubscriptionRef.make(true) } : {})
+          })
+          yield* made.clicks.pipe(Stream.runForEach(() => model.click(node.id)), reporting(`The button ${node.id}`), Effect.forkScoped)
+          return made
+        }),
+      menu: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteClicks(page, node.id)
+          const made = yield* menu({ items: node.items as never })
+          yield* made.choices.pipe(Stream.runForEach((id) => model.click(id)), reporting(`The menu ${node.id}`), Effect.forkScoped)
+          return made
+        }),
+      ribbon: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteClicks(page, node.id)
+          const made = yield* ribbon({ blocks: node.blocks as never })
+          yield* made.choices.pipe(Stream.runForEach((id) => model.click(id)), reporting(`The ribbon ${node.id}`), Effect.forkScoped)
+          return made
+        }),
+      list: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteSelection(page, node.id)
+          return yield* renderList(model, { data: yield* dataCollection(model.rows), template: fieldsTemplate(node.fields), ...(node.itemHeight === undefined ? {} : { itemHeight: node.itemHeight }) })
+        }),
+      dataview: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteSelection(page, node.id)
+          return yield* renderDataView(model, { data: yield* dataCollection(model.rows), template: fieldsTemplate(node.fields), ...(node.itemsInRow === undefined ? {} : { itemsInRow: node.itemsInRow }) })
+        }),
+      tree: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteTree(page, node.id)
+          return yield* renderTree(model, { data: yield* treeCollection(model.rows) })
+        }),
+      gantt: (node) => Effect.flatMap(remoteGantt(page, node.id), renderGantt),
+      scheduler: (node) =>
+        Effect.gen(function* () {
+          const browser = yield* Browser
+          const today = zoned(yield* SubscriptionRef.get(browser.now), yield* SubscriptionRef.get(browser.timeZone)).day
+          return yield* renderScheduler(yield* remoteScheduler(page, node.id, today))
+        }),
+      kanban: (node) =>
+        Effect.gen(function* () {
+          const text = (row: Row, field: string | undefined) => (field === undefined ? undefined : String((row as unknown as Record<string, unknown>)[field] ?? ""))
+          return yield* renderKanban(yield* remoteKanban<Row>(page, node.id), {
+            field: node.field as never,
+            columns: node.columns as never,
+            ...(node.lanes === undefined ? {} : { lanes: node.lanes as never }),
+            label: (row) => text(row, node.labelField) ?? "",
+            description: (row) => text(row, node.descriptionField)
+          })
         })
-        yield* made.clicks.pipe(Stream.runForEach(() => model.click(node.id)), reporting(`The button ${node.id}`), Effect.forkScoped)
-        return made
-      }
-      case "menu": {
-        const model = yield* remoteClicks(page, node.id)
-        const made = yield* menu({ items: node.items as never })
-        yield* made.choices.pipe(Stream.runForEach((id) => model.click(id)), reporting(`The menu ${node.id}`), Effect.forkScoped)
-        return made
-      }
-      case "ribbon": {
-        const model = yield* remoteClicks(page, node.id)
-        const made = yield* ribbon({ blocks: node.blocks as never })
-        yield* made.choices.pipe(Stream.runForEach((id) => model.click(id)), reporting(`The ribbon ${node.id}`), Effect.forkScoped)
-        return made
-      }
-      case "list": {
-        const model = yield* remoteSelection(page, node.id)
-        return yield* renderList(model, { data: yield* dataCollection(model.rows), template: fieldsTemplate(node.fields), ...(node.itemHeight === undefined ? {} : { itemHeight: node.itemHeight }) })
-      }
-      case "dataview": {
-        const model = yield* remoteSelection(page, node.id)
-        return yield* renderDataView(model, { data: yield* dataCollection(model.rows), template: fieldsTemplate(node.fields), ...(node.itemsInRow === undefined ? {} : { itemsInRow: node.itemsInRow }) })
-      }
-      case "tree": {
-        const model = yield* remoteTree(page, node.id)
-        return yield* renderTree(model, { data: yield* treeCollection(model.rows) })
-      }
-      case "gantt":
-        return yield* renderGantt(yield* remoteGantt(page, node.id))
-      case "scheduler": {
-        const browser = yield* Browser
-        const today = zoned(yield* SubscriptionRef.get(browser.now), yield* SubscriptionRef.get(browser.timeZone)).day
-        return yield* renderScheduler(yield* remoteScheduler(page, node.id, today))
-      }
-      case "kanban": {
-        const text = (row: Row, field: string | undefined) => (field === undefined ? undefined : String((row as unknown as Record<string, unknown>)[field] ?? ""))
-        return yield* renderKanban(yield* remoteKanban<Row>(page, node.id), {
-          field: node.field as never,
-          columns: node.columns as never,
-          ...(node.lanes === undefined ? {} : { lanes: node.lanes as never }),
-          label: (row) => text(row, node.labelField) ?? "",
-          description: (row) => text(row, node.descriptionField)
-        })
-      }
-    }
+    }) as Effect.Effect<unknown, never, Host | Browser | Scope.Scope>
   })
 
 /**
@@ -233,7 +240,7 @@ const childRefs = (node: UiNode, children: SubscriptionRef.SubscriptionRef<Reado
  */
 const chosen = <A>(page: PluginHost, id: string, first: A) =>
   Effect.gen(function* () {
-    const model = yield* remoteValue<A>(page, id, first)
+    const model = yield* remoteValue<A>(page, id, first, STATES.tabbar)
     const active = yield* SubscriptionRef.make(yield* SubscriptionRef.get(model.value))
     yield* SubscriptionRef.changes(model.value).pipe(
       Stream.runForEach((value) => Effect.flatMap(SubscriptionRef.get(active), (now) => (now === value ? Effect.void : SubscriptionRef.set(active, value)))),
@@ -286,7 +293,7 @@ const sidebarOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "sid
 const layoutOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "layout" }>, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>) =>
   Effect.gen(function* () {
     const refs = yield* childRefs(node, children)
-    const model = yield* remoteModel(page, node.id, { hidden: [] as ReadonlyArray<string> }, CELLS_ACTIONS)
+    const model = yield* remoteModel(page, node.id, { hidden: [] as ReadonlyArray<string> }, CELLS_ACTIONS, STATES.layout)
     const cells = []
     for (const cell of node.cells) {
       const id = cell.child.id

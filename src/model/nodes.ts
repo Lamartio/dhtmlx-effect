@@ -1,4 +1,4 @@
-import { Effect, Exit, Schema, Scope, Stream, SubscriptionRef } from "effect"
+import { Effect, Exit, Match, Schema, Scope, Stream, SubscriptionRef } from "effect"
 import type { Row as DataRow } from "../core/rows"
 import { chartModel, seriesIds } from "./chart"
 import { clickable, clickModel } from "./clicks"
@@ -10,6 +10,7 @@ import { kanbanModel } from "./kanban"
 import { type Input, input, stableJson } from "./model"
 import { schedulerModel } from "./scheduler"
 import { selectionModel, treeModel } from "./selection"
+import { EventSchema, Rows, TaskSchema } from "./states"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
   cellsModel, chartNode, clicksNode, datepickerNode, formNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
@@ -26,12 +27,6 @@ import type { UiState } from "./ui-state"
  * `bindTree` keeps a model for each node by id, puts the data into it, and sends the tree without
  * the data to the page. `Schema.encode(UiSchema)` gives the JSON of a whole tree, data and all.
  */
-
-/** A row of data: an id, and any fields. */
-const Rows = Schema.Array(Schema.Record(Schema.String, Schema.Unknown).pipe(Schema.check(Schema.makeFilter((row: Record<string, unknown>) => typeof row["id"] === "string" || "A row needs an id that is a string"))))
-
-const TaskSchema = Schema.Struct({ id: Schema.String, text: Schema.String, start: Schema.String, duration: Schema.Number, progress: Schema.Number, parent: Schema.optional(Schema.String) })
-const EventSchema = Schema.Struct({ id: Schema.String, text: Schema.String, start: Schema.String, end: Schema.String })
 
 export const Calendar = WireNodes.calendar.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
 export const Timepicker = WireNodes.timepicker.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
@@ -165,72 +160,70 @@ export const Tabbar = {
 }
 
 /** The data of a node, which goes into its model; and the node without it, which goes to the page. */
+/** The composed Schema of each kind of widget, by its `_tag`. */
+const COMPOSED = {
+  calendar: Calendar, timepicker: Timepicker, slider: Slider, colorpicker: Colorpicker, combobox: Combobox, grid: Grid, list: List, dataview: DataView, tree: Tree,
+  gantt: Gantt, scheduler: Scheduler, kanban: Kanban, toolbar: Toolbar, button: Button, menu: Menu, ribbon: Ribbon, form: Form, datepicker: DatePicker, chart: Chart
+} as const satisfies { readonly [K in Widget["_tag"]]: { readonly fields: object } }
+
+/** The fields of a kind that are data, not config: the fields of its composed Schema that its wire Schema has not. */
+const dataKeys = (tag: Widget["_tag"]): ReadonlyArray<string> =>
+  Object.keys(COMPOSED[tag].fields).filter((key) => !(key in WireNodes[tag].fields))
+
+/**
+ * The data of a node, which goes into its model, and the node without it, which goes to the page.
+ * A kind with one field of data gives that value; a kind with more (a Chart) gives them as one object.
+ */
 const split = (node: Widget): { readonly data: unknown; readonly wire: UiNode } => {
-  if (node._tag === "chart") {
-    // A Chart has two parts of data: its rows and its hidden series.
-    const { rows, hidden, ...wire } = node
-    return { data: { rows, hidden: hidden ?? [] }, wire: wire as UiNode }
-  }
-  const { value, rows, tasks, events, values, ...wire } = node as Widget & { value?: unknown; rows?: unknown; tasks?: unknown; events?: unknown; values?: unknown }
-  return { data: value ?? rows ?? tasks ?? events ?? values, wire: wire as UiNode }
+  const keys = dataKeys(node._tag)
+  const all = node as unknown as Record<string, unknown>
+  const wire = Object.fromEntries(Object.entries(all).filter(([key]) => !keys.includes(key))) as UiNode
+  return { data: keys.length === 1 ? all[keys[0]!] : Object.fromEntries(keys.map((key) => [key, all[key]])), wire }
 }
 
 /** The model of a node, with its data in `data`, in the document under the id of the node. */
 const modelOf = (node: Widget, data: SubscriptionRef.SubscriptionRef<any>, wire: UiNode): Effect.Effect<UiNode, never, UiState | Scope.Scope> => {
   const config = wire as never
-  switch (node._tag) {
-    case "calendar":
-      return Effect.flatMap(calendarModel({ value: data }), (model) => calendarNode(node.id, model, config))
-    case "timepicker":
-      return Effect.flatMap(timepickerModel({ value: data }), (model) => timepickerNode(node.id, model, config))
-    case "slider":
-      return Effect.flatMap(sliderModel({ value: data, ...(node.min === undefined ? {} : { min: node.min }) }), (model) => sliderNode(node.id, model, config))
-    case "colorpicker":
-      return Effect.flatMap(colorpickerModel({ value: data }), (model) => colorpickerNode(node.id, model, config))
-    case "combobox":
-      return Effect.flatMap(comboboxModel({ value: data, options: node.options }), (model) => comboboxNode(node.id, model, config))
-    case "grid":
-      return Effect.flatMap(gridModel({ columns: node.columns as never, rows: data, ...(node.menu === undefined ? {} : { menu: node.menu }) }), (model) => gridNode(node.id, model, config))
-    case "list":
-      return Effect.flatMap(selectionModel({ rows: data }), (model) => listNode(node.id, model, config))
-    case "dataview":
-      return Effect.flatMap(selectionModel({ rows: data }), (model) => dataviewNode(node.id, model, config))
-    case "tree":
-      return Effect.flatMap(treeModel({ rows: data }), (model) => treeNode(node.id, model, config))
-    case "gantt":
-      return Effect.flatMap(ganttModel({ tasks: data }), (model) => ganttNode(node.id, model, config))
-    case "scheduler":
-      return Effect.flatMap(schedulerModel({ events: data }), (model) => schedulerNode(node.id, model, config))
-    case "form":
-      // A form with no values in the tree starts empty.
-      return SubscriptionRef.update(data, (values) => values ?? {}).pipe(
+  /** A ref that follows one field of the data, for a kind with more than one field of data. */
+  const part = <A>(key: string, empty: A) =>
+    Effect.gen(function* () {
+      const ref = yield* SubscriptionRef.make<A>((yield* SubscriptionRef.get(data))[key] ?? empty)
+      yield* SubscriptionRef.changes(data).pipe(Stream.runForEach((now: any) => SubscriptionRef.set(ref, now[key] ?? empty)), Effect.forkScoped)
+      return ref
+    })
+  const clicks = (ids: ReadonlyArray<string>) => Effect.flatMap(clickModel(ids), (model) => clicksNode(wire as never, model))
+  // Each kind of widget has its model here: Match.valueTags makes a kind that is missing a type error.
+  return Match.valueTags(node, {
+    calendar: (node) => Effect.flatMap(calendarModel({ value: data }), (model) => calendarNode(node.id, model, config)),
+    timepicker: (node) => Effect.flatMap(timepickerModel({ value: data }), (model) => timepickerNode(node.id, model, config)),
+    slider: (node) => Effect.flatMap(sliderModel({ value: data, ...(node.min === undefined ? {} : { min: node.min }) }), (model) => sliderNode(node.id, model, config)),
+    colorpicker: (node) => Effect.flatMap(colorpickerModel({ value: data }), (model) => colorpickerNode(node.id, model, config)),
+    combobox: (node) => Effect.flatMap(comboboxModel({ value: data, options: node.options }), (model) => comboboxNode(node.id, model, config)),
+    grid: (node) => Effect.flatMap(gridModel({ columns: node.columns as never, rows: data, ...(node.menu === undefined ? {} : { menu: node.menu }) }), (model) => gridNode(node.id, model, config)),
+    list: (node) => Effect.flatMap(selectionModel({ rows: data }), (model) => listNode(node.id, model, config)),
+    dataview: (node) => Effect.flatMap(selectionModel({ rows: data }), (model) => dataviewNode(node.id, model, config)),
+    tree: (node) => Effect.flatMap(treeModel({ rows: data }), (model) => treeNode(node.id, model, config)),
+    gantt: (node) => Effect.flatMap(ganttModel({ tasks: data }), (model) => ganttNode(node.id, model, config)),
+    scheduler: (node) => Effect.flatMap(schedulerModel({ events: data }), (model) => schedulerNode(node.id, model, config)),
+    kanban: (node) =>
+      Effect.flatMap(kanbanModel({ rows: data, field: node.field as never, columns: node.columns as never, ...(node.lanes === undefined ? {} : { lanes: node.lanes as never }) }), (model) => kanbanNode(node.id, model as never, config)),
+    // A form with no values in the tree starts empty.
+    form: (node) =>
+      SubscriptionRef.update(data, (values) => values ?? {}).pipe(
         Effect.andThen(formModel(rulesCheck(node.fields), node.fields, { values: data })),
         Effect.flatMap((model) => formNode(wire as never, model))
-      )
-    case "chart":
-      return Effect.gen(function* () {
-        // The two parts of the data, each as a ref that follows the data of the node.
-        const part = <A>(key: "rows" | "hidden") =>
-          Effect.gen(function* () {
-            const ref = yield* SubscriptionRef.make<A>((yield* SubscriptionRef.get(data))[key])
-            yield* SubscriptionRef.changes(data).pipe(Stream.runForEach((now: any) => SubscriptionRef.set(ref, now[key])), Effect.forkScoped)
-            return ref
-          })
-        const model = yield* chartModel(seriesIds(node.config), { rows: yield* part<ReadonlyArray<DataRow>>("rows"), hidden: yield* part<ReadonlyArray<string>>("hidden") })
+      ),
+    datepicker: () => Effect.flatMap(calendarModel({ value: data }), (model) => datepickerNode(wire as never, model)),
+    chart: (node) =>
+      Effect.gen(function* () {
+        const model = yield* chartModel(seriesIds(node.config), { rows: yield* part<ReadonlyArray<DataRow>>("rows", []), hidden: yield* part<ReadonlyArray<string>>("hidden", []) })
         return yield* chartNode(wire as never, model)
-      })
-    case "datepicker":
-      return Effect.flatMap(calendarModel({ value: data }), (model) => datepickerNode(wire as never, model))
-    case "toolbar":
-    case "menu":
-      return Effect.flatMap(clickModel(clickable(node.items)), (model) => clicksNode(wire as never, model))
-    case "ribbon":
-      return Effect.flatMap(clickModel(clickable(node.blocks.flatMap((block) => block.items))), (model) => clicksNode(wire as never, model))
-    case "button":
-      return Effect.flatMap(clickModel(node.disabled === true ? [] : [node.id]), (model) => clicksNode(wire as never, model))
-    case "kanban":
-      return Effect.flatMap(kanbanModel({ rows: data, field: node.field as never, columns: node.columns as never, ...(node.lanes === undefined ? {} : { lanes: node.lanes as never }) }), (model) => kanbanNode(node.id, model as never, config))
-  }
+      }),
+    toolbar: (node) => clicks(clickable(node.items)),
+    menu: (node) => clicks(clickable(node.items)),
+    ribbon: (node) => clicks(clickable(node.blocks.flatMap((block) => block.items))),
+    button: (node) => clicks(node.disabled === true ? [] : [node.id])
+  }) as Effect.Effect<UiNode, never, UiState | Scope.Scope>
 }
 
 type Kept = { readonly scope: Scope.Closeable; readonly data: SubscriptionRef.SubscriptionRef<unknown>; readonly shape: string; last: string; readonly wire: UiNode }

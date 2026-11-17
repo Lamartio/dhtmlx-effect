@@ -6,6 +6,7 @@ import { GRID_ACTIONS, gridModel } from "./grid"
 import { KANBAN_ACTIONS, kanbanModel } from "./kanban"
 import { connectHost, type HostMessage, memoryChannel, type PluginMessage, remoteGantt, remoteGrid, remoteKanban, servePlugin } from "./remote"
 import { checksum, partOf, uiState } from "./ui-state"
+import { Problems } from "../ui/problems"
 
 /** Lets the fibers of both sides run: a message goes through a few of them. */
 const settle = Effect.forEach(Array.from({ length: 30 }), () => Effect.yieldNow, { discard: true })
@@ -95,4 +96,23 @@ it.effect("gives an action of the page undefined again where JSON made it null",
     yield* host.act("grid", "select", [null])
     yield* settle
     expect((yield* grid.snapshot).selected).toBe(undefined)
+  }).pipe(Effect.scoped))
+
+it.effect("refuses a state that does not pass the Schema of its kind, and the other parts go on", () =>
+  Effect.gen(function* () {
+    const reports: Array<string> = []
+    const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+    const host = yield* connectHost(hostEnd)
+    const good = { grid: { selected: "a", filters: {}, rows: [{ id: "a" }] }, gantt: { zoom: "week", tasks: [] } }
+    yield* pluginEnd.send({ _tag: "full", seq: 1, state: good, hash: checksum(good) })
+    yield* settle
+    const grid = yield* remoteGrid(host, "grid").pipe(Effect.provideService(Problems, { report: (where) => Effect.sync(() => void reports.push(where)) }))
+    const gantt = yield* remoteGantt(host, "gantt")
+    // The grid gets a selected row that is a number, and a zoom of the Gantt changes.
+    const bad = { grid: { selected: 5, filters: {}, rows: [{ id: "a" }] }, gantt: { zoom: "month", tasks: [] } }
+    yield* pluginEnd.send({ _tag: "full", seq: 2, state: bad, hash: checksum(bad) })
+    yield* settle
+    expect(yield* SubscriptionRef.get(grid.selected)).toBe("a")
+    expect(reports).toEqual(["The state of grid from the plugin"])
+    expect(yield* SubscriptionRef.get(gantt.zoom)).toBe("month")
   }).pipe(Effect.scoped))
