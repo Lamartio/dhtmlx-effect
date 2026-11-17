@@ -187,6 +187,7 @@ bunx playwright install chromium   # one time, for the tests
 bun run test                       # Vitest in Chromium
 bun run storybook                  # http://localhost:6007
 bun run size                       # what a Gantt with a toolbar costs in a page
+bun run demo                       # a plugin in a frame: http://localhost:4100, change demo/ui.ts and save
 ```
 
 - `src/core/` has plain functions, with no Effect and no DOM where that is possible: the diff of rows, the diff of a plan, the check of a form.

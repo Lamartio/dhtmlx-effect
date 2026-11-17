@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>dhtmlx-effect: a plugin in a frame</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+      header { padding: 8px 12px; border-bottom: 1px solid #ddd; font-size: 14px; }
+      #app { min-height: 0; display: flex; flex-direction: column; }
+      #plugin iframe { width: 0; height: 0; border: 0; position: absolute; }
+    </style>
+  </head>
+  <body>
+    <header>The page draws the UI. The plugin (in a frame from the other server) sends it: change <code>demo/ui.ts</code> and save.</header>
+    <div id="app"></div>
+    <div id="plugin"></div>
+    <script type="module" src="./host.ts"></script>
+  </body>
+</html>

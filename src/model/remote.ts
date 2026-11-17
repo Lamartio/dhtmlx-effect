@@ -40,7 +40,11 @@ export const memoryChannel = <A, B>() =>
     return [a, b] as const
   })
 
-/** The plugin side: sends the state of the registry, runs each action that comes in, and answers it. */
+/**
+ * The plugin side: sends the state of the registry, runs each action that comes in, and answers it.
+ * JSON has no `undefined`: an argument that was `undefined` in the page (a select of no row) comes
+ * as `null`, and goes to the action as `undefined` again.
+ */
 export const servePlugin = (ui: UiState["Service"], channel: Channel<HostMessage, PluginMessage>) =>
   Effect.gen(function* () {
     // Listen before the whole state is sent: the page drops the patches that it has already.
@@ -49,7 +53,8 @@ export const servePlugin = (ui: UiState["Service"], channel: Channel<HostMessage
       Stream.runForEach((message) =>
         message._tag === "resync"
           ? Effect.flatMap(ui.full, channel.send)
-          : Effect.flatMap(ui.run(message.id, message.action, message.args), (accepted) => channel.send({ _tag: "answer", n: message.n, accepted }))),
+          : Effect.flatMap(ui.run(message.id, message.action, message.args.map((arg) => (arg === null ? undefined : arg))), (accepted) =>
+              channel.send({ _tag: "answer", n: message.n, accepted }))),
       Effect.forkScoped({ startImmediately: true })
     )
     yield* Effect.flatMap(ui.full, channel.send)

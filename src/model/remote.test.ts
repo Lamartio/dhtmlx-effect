@@ -86,3 +86,13 @@ it.effect("refuses an action with an id or a name that the plugin does not have"
     expect(yield* ui.run("grid", "select", ["a"])).toBe(true)
     expect(yield* ui.run("grid", "select", ["lost"])).toBe(false)
   }).pipe(Effect.scoped))
+
+it.effect("gives an action of the page undefined again where JSON made it null", () =>
+  Effect.gen(function* () {
+    const { host, grid } = yield* both
+    yield* grid.select("a")
+    yield* settle
+    yield* host.act("grid", "select", [null])
+    yield* settle
+    expect((yield* grid.snapshot).selected).toBe(undefined)
+  }).pipe(Effect.scoped))

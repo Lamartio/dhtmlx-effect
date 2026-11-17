@@ -16,5 +16,5 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["bun"]
   },
-  "include": ["src", "scripts", ".storybook", "vitest.config.ts"]
+  "include": ["src", "scripts", "demo", ".storybook", "vitest.config.ts"]
 }
