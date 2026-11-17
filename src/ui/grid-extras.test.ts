@@ -135,3 +135,37 @@ it.live("has no range or block selection, clipboard, history or drag panel in th
     view.destructor()
     element.remove()
   }))
+
+it.live("runs on its model: a sort and a filter of the user are actions, and the model shows in the Grid", () =>
+  run(Effect.gen(function* () {
+    const host = yield* Host
+    const rows = yield* SubscriptionRef.make(ISSUES)
+    const data = yield* dataCollection(rows)
+    const made = yield* grid({
+      data,
+      history: 50,
+      columns: [{ id: "title", header: "Title", filter: "input" }, { id: "status", header: "Status" }, { id: "points", header: "Points", type: "number" }]
+    })
+    yield* settle
+    const order = () => data.map((row) => String(row.id))
+
+    // The user: a click on a header, and a text in a filter.
+    host.querySelectorAll<HTMLElement>(".dhx_grid-header-cell")[2]?.click()
+    yield* settle
+    expect((yield* made.model.snapshot).sort?.column).toBe("points")
+    headerFilter(made.grid, "title").setValue("Fra")
+    yield* settle
+    expect((yield* made.model.snapshot).filters).toEqual({ title: "Fra" })
+    const actions = (yield* made.model.recent).filter((entry) => entry._tag === "action").map((entry) => entry.name)
+    expect(actions).toEqual(["sortBy", "filter"])
+
+    // The model: a sort and a filter from code show in the Grid.
+    yield* made.model.filter("title", "")
+    yield* made.model.sortBy("points", "desc")
+    yield* settle
+    expect(order()).toEqual(["c", "b", "a"])
+    expect(host.querySelector(".dhx_grid-body")?.textContent).toContain("Forms")
+    yield* made.model.select("b")
+    yield* settle
+    expect(made.grid.selection.getCell()?.row?.id).toBe("b")
+  })))

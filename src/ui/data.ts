@@ -1,6 +1,7 @@
 import { DataCollection, DataView, Grid, List, setTheme, Tree, TreeCollection } from "dhx-suite"
-import { Effect, Option, PubSub, Scope, Stream, SubscriptionRef } from "effect"
+import { Effect, Option, Scope, Stream, SubscriptionRef } from "effect"
 import { diffRows, type Row, type RowOp } from "../core/rows"
+import { type GridEdit, type GridModel, gridModel, type GridModelOptions } from "../model/grid"
 import { Browser, follow } from "./browser"
 import { reportedCallback, reporting } from "./problems"
 import { Host, resource } from "./host"
@@ -123,29 +124,7 @@ type Selected = { readonly selected?: SubscriptionRef.SubscriptionRef<string | u
 const selectedOr = (options: Selected) =>
   options.selected === undefined ? SubscriptionRef.make<string | undefined>(undefined) : Effect.succeed(options.selected)
 
-export type GridColumn = {
-  readonly id: string
-  readonly header: string
-  readonly width?: number
-  /** Sorts on a click on the header. Default: true. */
-  readonly sortable?: boolean
-  readonly align?: "left" | "center" | "right"
-  /** What the values are. A `number` sorts as a number, and a `boolean` shows a checkbox. Default: `string`. */
-  readonly type?: "string" | "number" | "boolean" | "date"
-  /** The user can change the cells of this column: a double click opens the editor. Default: false. */
-  readonly editable?: boolean
-  /** The editor of a cell. Default: an input, or a checkbox for a `boolean`. */
-  readonly editor?: "input" | "select" | "combobox" | "checkbox" | "datePicker" | "textarea"
-  /** The choices of a `select` or a `combobox` editor, and of a `select` or `combo` filter that should not read them from the rows. */
-  readonly options?: ReadonlyArray<string>
-  /** A filter in the header, under the name of the column: a text input, or a list of the values. */
-  readonly filter?: "input" | "select" | "combo"
-  /** The user can drag the edge of the header to change the width. Default: false. */
-  readonly resizable?: boolean
-}
-
-/** A cell that the user changed: the id of the row, the id of the column, and the new value. */
-export type GridEdit = { readonly row: string; readonly column: string; readonly value: unknown }
+export type { GridColumn, GridEdit, GridSort } from "../model/grid"
 
 const FILTERS = { input: "inputFilter", select: "selectFilter", combo: "comboFilter" } as const
 
@@ -156,11 +135,15 @@ const FILTERS = { input: "inputFilter", select: "selectFilter", combo: "comboFil
  * A column can have a filter in its header, and its cells can be editable. An edit of the user
  * comes in `edits`: the store is the truth, so the app writes the new value into the store, and the
  * collection follows it. `forEachReported` with `edits` does that in one line.
+ *
+ * The Grid runs on its model (`gridModel`): a click, a sort, a filter and an edit of the user are
+ * its actions, and the selected row, the sort and the filters of the model show in the Grid. The
+ * model cannot clear a sort: DHTMLX keeps the order it has.
  */
-export const grid = (options: { readonly data: DataCollection; readonly columns: ReadonlyArray<GridColumn> } & Selected) =>
+export const grid = (options: { readonly data: DataCollection } & Omit<GridModelOptions<Row>, "rows">) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const selected = yield* selectedOr(options)
+    const model = yield* gridModel(options)
     const view = yield* resourceAfterPaint(
       "grid",
       () =>
@@ -186,45 +169,70 @@ export const grid = (options: { readonly data: DataCollection; readonly columns:
       (view) => view.destructor()
     )
     yield* theme
-    const edits = yield* Effect.acquireRelease(PubSub.unbounded<GridEdit>(), PubSub.shutdown)
-    const onEdit = yield* reportedCallback("The Grid, on an edit of a cell", (value: unknown, row: { readonly id: string | number }, column: { readonly id: string | number }) => {
-      Effect.runSync(PubSub.publish(edits, { row: String(row.id), column: String(column.id), value }))
-    })
-    yield* resource(
-      "listener",
-      () => view.events.on("afterEditEnd" as never, onEdit as never),
-      () => view.events.detach("afterEditEnd" as never)
-    )
+    // What came from the model is not sent back: DHTMLX tells of each change that we make, and a set
+    // inside the set of a ref would wait for its lock, which `runSync` cannot do.
     let applying = false
-    const set = (id: string | undefined) => {
-      if (!applying && Effect.runSync(SubscriptionRef.get(selected)) !== id) Effect.runSync(SubscriptionRef.set(selected, id))
+    const act = (action: Effect.Effect<void>) => {
+      if (!applying) Effect.runSync(action)
     }
+    const showing = (f: () => void) => {
+      applying = true
+      try {
+        f()
+      } finally {
+        applying = false
+      }
+    }
+    const onEdit = yield* reportedCallback("The Grid, on an edit of a cell", (value: unknown, row: { readonly id: string | number }, column: { readonly id: string | number }) =>
+      act(model.edit(String(row.id), String(column.id), value)))
+    const onSort = yield* reportedCallback("The Grid, on a sort", (column: { readonly id: string | number } | string | number, dir: "asc" | "desc") =>
+      act(model.sortBy(String(typeof column === "object" ? column.id : column), dir)))
+    const onFilter = yield* reportedCallback("The Grid, on a filter", (value: unknown, column: string | number) =>
+      act(model.filter(String(column), value === undefined || value === null ? "" : String(Array.isArray(value) ? value.join(",") : value))))
     const events = (view.selection as unknown as { readonly events: Selection["events"] }).events
     yield* resource(
       "listener",
       () => {
-        events.on("afterSelect" as never, (row: unknown) => set(String((row as { id: string | number }).id)))
-        events.on("afterUnSelect" as never, () => set(undefined))
+        view.events.on("afterEditEnd" as never, onEdit as never)
+        view.events.on("afterSort" as never, onSort as never)
+        view.events.on("filterChange" as never, onFilter as never)
+        events.on("afterSelect" as never, (row: unknown) => act(model.select(String((row as { id: string | number }).id))))
+        events.on("afterUnSelect" as never, () => act(model.select(undefined)))
       },
       () => {
+        view.events.detach("afterEditEnd" as never)
+        view.events.detach("afterSort" as never)
+        view.events.detach("filterChange" as never)
         events.detach("afterSelect" as never)
         events.detach("afterUnSelect" as never)
       }
     )
-    yield* follow(selected, (id) => {
+    yield* follow(model.selected, (id) => {
       const current = (view.selection.getCell() as { row?: { id: string | number } } | undefined)?.row?.id
       if (id === (current === undefined ? undefined : String(current))) return
-      applying = true
-      try {
+      showing(() => {
         if (id === undefined) view.selection.removeCell()
         else if (options.data.exists(id)) view.selection.setCell(id)
-      } finally {
-        applying = false
-      }
+      })
     })
-    return { grid: view, selected, edits: Stream.fromPubSub(edits) }
+    yield* follow(model.sort, (sort) => {
+      const now = options.data.getSortingStates()[0]
+      if (sort === undefined || (now !== undefined && String(now.by) === sort.column && now.dir === sort.dir)) return
+      showing(() => options.data.sort({ by: sort.column, dir: sort.dir }, { smartSorting: true }))
+    }, "The Grid, while it followed its sort")
+    yield* follow(model.filters, (filters) => {
+      for (const column of options.columns) {
+        if (column.filter === undefined) continue
+        const filter = view.getHeaderFilter(column.id)
+        const shown = Array.isArray(filter.value) ? filter.value.join(",") : (filter.value ?? "")
+        const wanted = filters[column.id] ?? ""
+        if (shown === wanted) continue
+        showing(() => (wanted === "" ? filter.clear() : filter.setValue(wanted)))
+      }
+    }, "The Grid, while it followed its filters")
+    return { grid: view, selected: model.selected, edits: model.edits, model }
   }) as Effect.Effect<
-    { readonly grid: Grid; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>; readonly edits: Stream.Stream<GridEdit> },
+    { readonly grid: Grid; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>; readonly edits: Stream.Stream<GridEdit>; readonly model: GridModel },
     never,
     Host | Browser | Scope.Scope
   >
