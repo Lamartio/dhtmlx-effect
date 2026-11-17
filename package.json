@@ -58,7 +58,8 @@
     "build": "tsc -p tsconfig.build.json",
     "storybook": "storybook dev --port 6007 --host 127.0.0.1 --ci --disable-telemetry",
     "book:build": "storybook build --quiet --disable-telemetry",
-    "size": "bun scripts/size.ts"
+    "size": "bun scripts/size.ts",
+    "utilities": "bun scripts/utilities.ts"
   },
   "peerDependencies": {
     "@dhtmlx/booking": "^1.1.1",
@@ -126,6 +127,7 @@
     "@effect/platform-browser": "4.1.2",
     "@effect/vitest": "4.1.2",
     "@storybook/html-vite": "10.6.6",
+    "@tailwindcss/node": "4.3.4",
     "@types/bun": "^1.4.4",
     "@vitest/browser-playwright": "5.1.0",
     "dhtmlx-gantt": "10.0.3",
@@ -134,6 +136,7 @@
     "effect": "4.1.2",
     "playwright": "1.65.0",
     "storybook": "10.6.6",
+    "tailwindcss": "4.3.4",
     "typescript": "^7.0.2",
     "vite": "8.3.0",
     "vitest": "5.1.0"

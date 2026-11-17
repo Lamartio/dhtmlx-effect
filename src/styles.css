@@ -1,5 +1,13 @@
 /* The few styles of the wrappers. The rest is the CSS of DHTMLX. Load it after the CSS of DHTMLX. */
 
+/* The spacing and place classes that a node of a plugin may have (src/model/utilities.ts). */
+@import "./utilities.css";
+
+/* A node of a plugin: the place of an absolute child. :where, so a class of the node (absolute) wins. */
+:where(.dhxe-node) {
+  position: relative;
+}
+
 /* A part of the tree stopped: red, at the top, never hidden. */
 .dhxe-error {
   margin: 0 0 8px;

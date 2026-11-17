@@ -480,7 +480,7 @@ it.live("shows a confirm of the plugin in the page as text, and gives the click 
     }))
   }))
 
-it.live("opens a window of the plugin with its child, gives the cross to the plugin, and shows a tooltip", () =>
+it.live("opens a window of the plugin with its child, gives the cross to the plugin, shows a tooltip, and sets the classes of a node", () =>
   Effect.gen(function* () {
     const element = document.createElement("div")
     element.style.height = "200px"
@@ -493,7 +493,8 @@ it.live("opens a window of the plugin with its child, gives the cross to the plu
         Column.make({
           id: "main",
           children: [
-            Button.make({ id: "help-button", label: "Help", tooltip: "Opens <the> help", size: 40 }),
+            Button.make({ id: "help-button", label: "Help", tooltip: "Opens <the> help", size: 40, classes: ["mx-2"] }),
+            Button.make({ id: "fab", label: "+", classes: ["absolute", "right-4", "bottom-4"] }),
             Window.make({ id: "help", title: "Help", open, child: Button.make({ id: "inner", label: "Inside the window" }) })
           ]
         })
@@ -524,6 +525,12 @@ it.live("opens a window of the plugin with its child, gives the cross to the plu
       element.querySelector("button")!.closest<HTMLElement>(".dhxe-node")!.dispatchEvent(new MouseEvent("mouseenter"))
       yield* Effect.sleep("800 millis")
       expect(document.body.textContent).toContain("Opens <the> help")
+      // The spacing and place classes of a node, from the CSS of the list.
+      const help = element.querySelector("button")!.closest<HTMLElement>(".dhxe-node")!
+      expect(getComputedStyle(help).marginLeft).toBe("8px")
+      const fab = [...element.querySelectorAll("button")].find((button) => button.textContent === "+")!.closest<HTMLElement>(".dhxe-node")!
+      expect(getComputedStyle(fab).position).toBe("absolute")
+      expect(getComputedStyle(fab).right).toBe("16px")
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))

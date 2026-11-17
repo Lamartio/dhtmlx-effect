@@ -146,6 +146,8 @@ export default Layout.make({
       collapsable: true,
       child: Column.make({
         id: "settings",
+        // Spacing from the fixed list of classes (src/model/utilities.ts); a class outside it is refused.
+        classes: ["p-2", "gap-2"],
         children: [
           Toolbar.make({ id: "bar", size: 56, items: [{ title: "Settings" }, { spacer: true }, { id: "reset", label: "Reset", view: "link" }] }),
           Slider.make({ id: "points", label: "Points", min: 0, max: 13, value: 5, size: 90 }),

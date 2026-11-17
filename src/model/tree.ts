@@ -13,6 +13,7 @@ import type { Row } from "../core/rows"
 import { SCHEDULER_ACTIONS, type SchedulerModel } from "./scheduler"
 import { SELECTION_ACTIONS, type SelectionModel, TREE_ACTIONS, type TreeModel } from "./selection"
 import { type Part, partOf, UiState } from "./ui-state"
+import { Classes, type Utility } from "./utilities"
 
 /**
  * The UI as data, made in the plugin: a tree of nodes, each with its kind and its config. The state
@@ -53,31 +54,31 @@ const KanbanColumnSchema = Schema.Struct({
 
 /** The node of each widget as it goes to the page: its kind, its id and its config, with no data. */
 export const WireNodes = {
-  calendar: Schema.TaggedStruct("calendar", { id: Schema.String, size: Size, tooltip: Tooltip }),
-  timepicker: Schema.TaggedStruct("timepicker", { id: Schema.String, size: Size, tooltip: Tooltip }),
-  slider: Schema.TaggedStruct("slider", { id: Schema.String, size: Size, tooltip: Tooltip, min: Schema.optional(Schema.Number), max: Schema.optional(Schema.Number), step: Schema.optional(Schema.Number), label: Schema.optional(Schema.String) }),
-  colorpicker: Schema.TaggedStruct("colorpicker", { id: Schema.String, size: Size, tooltip: Tooltip }),
-  combobox: Schema.TaggedStruct("combobox", { id: Schema.String, size: Size, tooltip: Tooltip, options: Schema.Array(Schema.Struct({ value: Schema.String, label: Schema.String })), label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
+  calendar: Schema.TaggedStruct("calendar", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes }),
+  timepicker: Schema.TaggedStruct("timepicker", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes }),
+  slider: Schema.TaggedStruct("slider", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, min: Schema.optional(Schema.Number), max: Schema.optional(Schema.Number), step: Schema.optional(Schema.Number), label: Schema.optional(Schema.String) }),
+  colorpicker: Schema.TaggedStruct("colorpicker", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes }),
+  combobox: Schema.TaggedStruct("combobox", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, options: Schema.Array(Schema.Struct({ value: Schema.String, label: Schema.String })), label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
   /** A Grid; `menu` is the context menu of a row (a right click, or the Menu key). */
-  grid: Schema.TaggedStruct("grid", { id: Schema.String, size: Size, tooltip: Tooltip, columns: Schema.Array(GridColumnSchema), menu: Schema.optional(Schema.Array(MenuItemSchema)) }),
-  toolbar: Schema.TaggedStruct("toolbar", { id: Schema.String, size: Size, tooltip: Tooltip, items: Schema.Array(ToolbarItemSchema) }),
+  grid: Schema.TaggedStruct("grid", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, columns: Schema.Array(GridColumnSchema), menu: Schema.optional(Schema.Array(MenuItemSchema)) }),
+  toolbar: Schema.TaggedStruct("toolbar", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, items: Schema.Array(ToolbarItemSchema) }),
   button: Schema.TaggedStruct("button", {
     id: Schema.String,
-    size: Size, tooltip: Tooltip,
+    size: Size, tooltip: Tooltip, classes: Classes,
     label: Schema.String,
     color: Schema.optional(Schema.Literals(["primary", "secondary", "danger", "success"])),
     view: Schema.optional(Schema.Literals(["flat", "link"])),
     disabled: Schema.optional(Schema.Boolean)
   }),
   /** A form from a plugin: its fields as data, with their rules (`required`, `pattern`, `min`, `max`). */
-  form: Schema.TaggedStruct("form", { id: Schema.String, size: Size, tooltip: Tooltip, fields: Schema.Array(FieldSchema), submitLabel: Schema.optional(Schema.String) }),
-  datepicker: Schema.TaggedStruct("datepicker", { id: Schema.String, size: Size, tooltip: Tooltip, label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
+  form: Schema.TaggedStruct("form", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, fields: Schema.Array(FieldSchema), submitLabel: Schema.optional(Schema.String) }),
+  datepicker: Schema.TaggedStruct("datepicker", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
   /** A Chart: its config as data (type, series, scales, legend), and its rows as the state of its model. */
-  chart: Schema.TaggedStruct("chart", { id: Schema.String, size: Size, tooltip: Tooltip, config: ChartConfigSchema }),
+  chart: Schema.TaggedStruct("chart", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, config: ChartConfigSchema }),
   /** A Diagram (`editor: true` for the editor, where the user draws): its kind and its config as data, its items as the state of its model. */
   diagram: Schema.TaggedStruct("diagram", {
     id: Schema.String,
-    size: Size, tooltip: Tooltip,
+    size: Size, tooltip: Tooltip, classes: Classes,
     type: Schema.optional(Schema.Literals(["default", "org", "mindmap"])),
     editor: Schema.optional(Schema.Boolean),
     config: Schema.optional(Schema.Record(Schema.String, Schema.Unknown))
@@ -85,22 +86,22 @@ export const WireNodes = {
   /** A RichText editor: its format and its bars as config, its text as the state of a value model. */
   richtext: Schema.TaggedStruct("richtext", {
     id: Schema.String,
-    size: Size, tooltip: Tooltip,
+    size: Size, tooltip: Tooltip, classes: Classes,
     format: Schema.optional(Schema.Literals(["html", "markdown", "text"])),
     toolbar: Schema.optional(Schema.Boolean),
     menubar: Schema.optional(Schema.Boolean),
     readOnly: Schema.optional(Schema.Boolean)
   }),
   /** A To Do List: its tasks, projects and people as the state of its model. */
-  todo: Schema.TaggedStruct("todo", { id: Schema.String, size: Size, tooltip: Tooltip, readonly: Schema.optional(Schema.Boolean) }),
+  todo: Schema.TaggedStruct("todo", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, readonly: Schema.optional(Schema.Boolean) }),
   /** A Booking: the first and the last day as ISO dates; its cards are the state of its model. */
-  booking: Schema.TaggedStruct("booking", { id: Schema.String, size: Size, tooltip: Tooltip, start: Schema.optional(Schema.String), end: Schema.optional(Schema.String) }),
+  booking: Schema.TaggedStruct("booking", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, start: Schema.optional(Schema.String), end: Schema.optional(Schema.String) }),
   /** A Pivot: its fields and its panel as config; its rows and its build are the state of its model. */
-  pivot: Schema.TaggedStruct("pivot", { id: Schema.String, size: Size, tooltip: Tooltip, fields: Schema.Array(PivotFieldSchema), configPanel: Schema.optional(Schema.Boolean) }),
+  pivot: Schema.TaggedStruct("pivot", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, fields: Schema.Array(PivotFieldSchema), configPanel: Schema.optional(Schema.Boolean) }),
   /** A Spreadsheet: its size and its bars as config; its cells are the state of its model. */
   spreadsheet: Schema.TaggedStruct("spreadsheet", {
     id: Schema.String,
-    size: Size, tooltip: Tooltip,
+    size: Size, tooltip: Tooltip, classes: Classes,
     rowsCount: Schema.optional(Schema.Number),
     colsCount: Schema.optional(Schema.Number),
     editLine: Schema.optional(Schema.Boolean),
@@ -109,28 +110,28 @@ export const WireNodes = {
     multiSheets: Schema.optional(Schema.Boolean)
   }),
   /** A Vault: the user adds files and sees them; the files are the state of its model, and the bytes go to the plugin. */
-  vault: Schema.TaggedStruct("vault", { id: Schema.String, size: Size, tooltip: Tooltip, mode: Schema.optional(Schema.Literals(["list", "grid"])), toolbar: Schema.optional(Schema.Boolean), maxSize: Schema.optional(Schema.Number) }),
+  vault: Schema.TaggedStruct("vault", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, mode: Schema.optional(Schema.Literals(["list", "grid"])), toolbar: Schema.optional(Schema.Boolean), maxSize: Schema.optional(Schema.Number) }),
   /** A button that opens the file dialog; each file goes to the plugin with its bytes. */
   filepicker: Schema.TaggedStruct("filepicker", {
     id: Schema.String,
-    size: Size, tooltip: Tooltip,
+    size: Size, tooltip: Tooltip, classes: Classes,
     label: Schema.optional(Schema.String),
     accept: Schema.optional(Schema.String),
     multiple: Schema.optional(Schema.Boolean),
     maxSize: Schema.optional(Schema.Number)
   }),
-  menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, tooltip: Tooltip, items: Schema.Array(MenuItemSchema) }),
-  ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, tooltip: Tooltip, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
+  menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, items: Schema.Array(MenuItemSchema) }),
+  ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */
-  list: Schema.TaggedStruct("list", { id: Schema.String, size: Size, tooltip: Tooltip, fields: Schema.Array(Schema.String), itemHeight: Schema.optional(Schema.Number) }),
-  dataview: Schema.TaggedStruct("dataview", { id: Schema.String, size: Size, tooltip: Tooltip, fields: Schema.Array(Schema.String), itemsInRow: Schema.optional(Schema.Number) }),
+  list: Schema.TaggedStruct("list", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, fields: Schema.Array(Schema.String), itemHeight: Schema.optional(Schema.Number) }),
+  dataview: Schema.TaggedStruct("dataview", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes, fields: Schema.Array(Schema.String), itemsInRow: Schema.optional(Schema.Number) }),
   /** A Tree shows the `value` of a row. */
-  tree: Schema.TaggedStruct("tree", { id: Schema.String, size: Size, tooltip: Tooltip }),
-  gantt: Schema.TaggedStruct("gantt", { id: Schema.String, size: Size, tooltip: Tooltip }),
-  scheduler: Schema.TaggedStruct("scheduler", { id: Schema.String, size: Size, tooltip: Tooltip }),
+  tree: Schema.TaggedStruct("tree", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes }),
+  gantt: Schema.TaggedStruct("gantt", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes }),
+  scheduler: Schema.TaggedStruct("scheduler", { id: Schema.String, size: Size, tooltip: Tooltip, classes: Classes }),
   kanban: Schema.TaggedStruct("kanban", {
     id: Schema.String,
-    size: Size, tooltip: Tooltip,
+    size: Size, tooltip: Tooltip, classes: Classes,
     field: Schema.String,
     columns: Schema.Array(KanbanColumnSchema),
     lanes: Schema.optional(Schema.Struct({ field: Schema.String, rows: Schema.Array(Schema.Struct({ id: Schema.String, label: Schema.String, collapsed: Schema.optional(Schema.Boolean) })) })),
@@ -144,7 +145,7 @@ export const WidgetNodeSchema = Schema.Union(Object.values(WireNodes))
 export type WidgetNode = typeof WidgetNodeSchema.Type
 
 /** A frame: its children from top to bottom (`column`) or from left to right (`row`). */
-export type FrameNode = { readonly _tag: "column" | "row"; readonly id: string; readonly size?: number | undefined; readonly children: ReadonlyArray<UiNode> }
+export type FrameNode = { readonly _tag: "column" | "row"; readonly id: string; readonly size?: number | undefined; readonly classes?: ReadonlyArray<Utility> | undefined; readonly children: ReadonlyArray<UiNode> }
 /**
  * Tabs, each with a label and a child node; the id of a tab is the id of its child. The open tab is
  * the state of a model under the id of the tabbar (`tabsModel`), and the page draws only that tab.
@@ -215,6 +216,7 @@ export const UiNodeSchema: Schema.Codec<UiNode> = Schema.Union([
     _tag: Schema.Literals(["column", "row"]),
     id: Schema.String,
     size: Size,
+    classes: Classes,
     children: Schema.Array(Schema.suspend((): Schema.Codec<UiNode> => UiNodeSchema))
   }),
   Schema.Struct({

@@ -481,19 +481,23 @@ const nodePart = (page: PluginHost, item: SubscriptionRef.SubscriptionRef<UiNode
     const show = yield* swap
     const children = yield* SubscriptionRef.make<ReadonlyArray<UiNode>>([])
     let shape: string | undefined
+    let classes: ReadonlyArray<string> = []
     yield* SubscriptionRef.changes(item).pipe(
       Stream.runForEach((node) =>
         Effect.gen(function* () {
           const size = node.size
           element.style.flex = size === undefined ? "1 1 0" : `0 0 ${size}px`
           element.style[frame === "column" ? "minHeight" : "minWidth"] = "0"
+          // classList, not className: a widget adds classes of its own to the element.
+          element.classList.remove(...classes)
+          classes = ("classes" in node ? node.classes : undefined) ?? []
+          element.classList.add(...classes)
           yield* SubscriptionRef.set(children, childrenOf(node))
           const next = shapeOf(node)
           if (next === shape) return
           shape = next
           // The base of each new widget: a widget can change these (a sidebar sets a row), so they
           // are set again only when the widget is made again, not on each change of the node.
-          element.style.position = "relative"
           element.style.display = "flex"
           element.style.flexDirection = "column"
           const tooltip = "tooltip" in node ? node.tooltip : undefined

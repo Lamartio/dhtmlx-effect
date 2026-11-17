@@ -23,6 +23,7 @@ import {
   WireNodes
 } from "./tree"
 import { partOf, type UiState } from "./ui-state"
+import { Classes, type Utility } from "./utilities"
 
 /**
  * The UI of a plugin, composed from Effect Schema: one Schema for each kind of node, with its config
@@ -76,7 +77,7 @@ const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List
 type Widget = (typeof Widgets)[number]["Type"]
 
 /** A frame of the composed UI, with composed children. */
-export type Frame = { readonly _tag: "column" | "row"; readonly id: string; readonly size?: number | undefined; readonly children: ReadonlyArray<Ui> }
+export type Frame = { readonly _tag: "column" | "row"; readonly id: string; readonly size?: number | undefined; readonly classes?: ReadonlyArray<Utility> | undefined; readonly children: ReadonlyArray<Ui> }
 /** Tabs of the composed UI, each with a label and a child; `value` is the id of the tab that opens first. */
 export type Tabs = {
   readonly _tag: "tabbar"
@@ -126,7 +127,7 @@ export type Ui = Widget | Frame | Tabs | Side | Cells | Win
 
 export const UiSchema: Schema.Codec<Ui> = Schema.Union([
   ...Widgets,
-  Schema.Struct({ _tag: Schema.Literals(["column", "row"]), id: Schema.String, size: Schema.optional(Schema.Number), children: Schema.Array(Schema.suspend((): Schema.Codec<Ui> => UiSchema)) }),
+  Schema.Struct({ _tag: Schema.Literals(["column", "row"]), id: Schema.String, size: Schema.optional(Schema.Number), classes: Classes, children: Schema.Array(Schema.suspend((): Schema.Codec<Ui> => UiSchema)) }),
   Schema.Struct({
     _tag: Schema.Literal("tabbar"),
     id: Schema.String,
@@ -170,7 +171,7 @@ export const UiSchema: Schema.Codec<Ui> = Schema.Union([
 ]) as never
 
 const frame = (tag: "column" | "row") => ({
-  make: (input: { readonly id: string; readonly size?: number; readonly children: ReadonlyArray<Ui> }): Frame => {
+  make: (input: { readonly id: string; readonly size?: number; readonly classes?: ReadonlyArray<Utility>; readonly children: ReadonlyArray<Ui> }): Frame => {
     const made: Frame = { _tag: tag, ...input }
     Schema.decodeUnknownSync(UiSchema)(made)
     return made
@@ -313,7 +314,7 @@ export const bindTree = (source: Input<Ui>): Effect.Effect<void, never, UiState 
         if (node._tag === "column" || node._tag === "row") {
           const children: Array<UiNode> = []
           for (const one of node.children) children.push(yield* visit(one, seen))
-          return { _tag: node._tag, id: node.id, children, ...(node.size === undefined ? {} : { size: node.size }) }
+          return { _tag: node._tag, id: node.id, children, ...(node.size === undefined ? {} : { size: node.size }), ...(node.classes === undefined ? {} : { classes: node.classes }) }
         }
         if (node._tag === "sidebar") {
           const items: Array<SidebarNode["items"][number]> = []
