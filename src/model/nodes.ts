@@ -8,7 +8,8 @@ import { schedulerModel } from "./scheduler"
 import { selectionModel, treeModel } from "./selection"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
-  tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode, WireNodes
+  cellsModel, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
+  WireNodes
 } from "./tree"
 import type { UiState } from "./ui-state"
 
@@ -54,8 +55,33 @@ export type Tabs = {
   readonly value?: string | undefined
   readonly tabs: ReadonlyArray<{ readonly label: string; readonly child: Ui }>
 }
-/** A node of the composed UI: a widget with its data, a frame, or tabs. */
-export type Ui = Widget | Frame | Tabs
+/** A sidebar of the composed UI: an item for each child; `value` is the id of the item that is chosen first. */
+export type Side = {
+  readonly _tag: "sidebar"
+  readonly id: string
+  readonly size?: number | undefined
+  readonly value?: string | undefined
+  readonly width?: number | undefined
+  readonly items: ReadonlyArray<{ readonly label: string; readonly icon?: string | undefined; readonly child: Ui }>
+}
+/** A layout of the composed UI: a cell for each child; `hidden` are the ids of the cells that start hidden. */
+export type Cells = {
+  readonly _tag: "layout"
+  readonly id: string
+  readonly size?: number | undefined
+  readonly direction: "rows" | "cols"
+  readonly type?: "line" | "wide" | "space" | "none" | undefined
+  readonly hidden?: ReadonlyArray<string> | undefined
+  readonly cells: ReadonlyArray<{
+    readonly child: Ui
+    readonly header?: string | undefined
+    readonly size?: number | string | undefined
+    readonly resizable?: boolean | undefined
+    readonly collapsable?: boolean | undefined
+  }>
+}
+/** A node of the composed UI: a widget with its data, a frame, tabs, a sidebar or a layout. */
+export type Ui = Widget | Frame | Tabs | Side | Cells
 
 export const UiSchema: Schema.Codec<Ui> = Schema.Union([
   ...Widgets,
@@ -66,6 +92,29 @@ export const UiSchema: Schema.Codec<Ui> = Schema.Union([
     size: Schema.optional(Schema.Number),
     value: Schema.optional(Schema.String),
     tabs: Schema.Array(Schema.Struct({ label: Schema.String, child: Schema.suspend((): Schema.Codec<Ui> => UiSchema) }))
+  }),
+  Schema.Struct({
+    _tag: Schema.Literal("sidebar"),
+    id: Schema.String,
+    size: Schema.optional(Schema.Number),
+    value: Schema.optional(Schema.String),
+    width: Schema.optional(Schema.Number),
+    items: Schema.Array(Schema.Struct({ label: Schema.String, icon: Schema.optional(Schema.String), child: Schema.suspend((): Schema.Codec<Ui> => UiSchema) }))
+  }),
+  Schema.Struct({
+    _tag: Schema.Literal("layout"),
+    id: Schema.String,
+    size: Schema.optional(Schema.Number),
+    direction: Schema.Literals(["rows", "cols"]),
+    type: Schema.optional(Schema.Literals(["line", "wide", "space", "none"])),
+    hidden: Schema.optional(Schema.Array(Schema.String)),
+    cells: Schema.Array(Schema.Struct({
+      child: Schema.suspend((): Schema.Codec<Ui> => UiSchema),
+      header: Schema.optional(Schema.String),
+      size: Schema.optional(Schema.Union([Schema.Number, Schema.String])),
+      resizable: Schema.optional(Schema.Boolean),
+      collapsable: Schema.optional(Schema.Boolean)
+    }))
   })
 ]) as never
 
@@ -80,6 +129,18 @@ const frame = (tag: "column" | "row") => ({
 export const Column = frame("column")
 /** A frame: its children from left to right. */
 export const Row = frame("row")
+
+/** Checks a node with `UiSchema` and gives it: the `make` of a node that has children. */
+const checked = <N extends Ui>(made: N): N => {
+  Schema.decodeUnknownSync(UiSchema)(made)
+  return made
+}
+
+/** A Sidebar with an item for each child; the page draws the child of the chosen item, and a click goes to the plugin. */
+export const Sidebar = { make: (input: Omit<Side, "_tag">): Side => checked({ _tag: "sidebar", ...input }) }
+
+/** A DHTMLX Layout with a cell for each child. The plugin hides and shows cells (the actions `hide` and `show`). */
+export const Layout = { make: (input: Omit<Cells, "_tag">): Cells => checked({ _tag: "layout", ...input }) }
 
 /** Tabs, each with a label and a child node. The page draws only the open tab; a click on a tab goes to the plugin. */
 export const Tabbar = {
@@ -153,6 +214,23 @@ export const bindTree = (source: Input<Ui>): Effect.Effect<void, never, UiState 
           const children: Array<UiNode> = []
           for (const one of node.children) children.push(yield* visit(one, seen))
           return { _tag: node._tag, id: node.id, children, ...(node.size === undefined ? {} : { size: node.size }) }
+        }
+        if (node._tag === "sidebar") {
+          const items: Array<SidebarNode["items"][number]> = []
+          for (const item of node.items) items.push({ label: item.label, ...(item.icon === undefined ? {} : { icon: item.icon }), child: yield* visit(item.child, seen) })
+          const ids = node.items.map((item) => item.child.id)
+          const config = { ...(node.width === undefined ? {} : { width: node.width }), ...(node.size === undefined ? {} : { size: node.size }) }
+          yield* keep(node.id, stableJson(ids), node.value ?? ids[0], (data) => Effect.flatMap(tabsModel(ids, data), (model) => sidebarNode(node.id, model, items, config)))
+          return { _tag: "sidebar", id: node.id, items, ...config } satisfies SidebarNode
+        }
+        if (node._tag === "layout") {
+          const cells: Array<LayoutNode["cells"][number]> = []
+          for (const { child, ...cell } of node.cells) cells.push({ ...cell, child: yield* visit(child, seen) })
+          const ids = node.cells.map((cell) => cell.child.id)
+          const { hidden, cells: _cells, _tag, id, ...config } = node
+          const wire: LayoutNode = { _tag: "layout", id: node.id, ...config, cells }
+          yield* keep(node.id, stableJson(ids), hidden ?? [], (data) => Effect.flatMap(cellsModel(ids, { hidden: data }), (model) => layoutNode(node.id, model, { ...config, cells })))
+          return wire
         }
         if (node._tag === "tabbar") {
           const tabs: Array<{ readonly label: string; readonly child: UiNode }> = []

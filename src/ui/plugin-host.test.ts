@@ -11,7 +11,7 @@ import { kanbanModel } from "../model/kanban"
 import { connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
 import { column, gridNode, kanbanNode, publishTree, sliderNode, type UiNode } from "../model/tree"
 import { UiState, uiState } from "../model/ui-state"
-import { bindTree, Column, Grid, Kanban, Tabbar } from "../model/nodes"
+import { bindTree, Column, Grid, Kanban, Layout, Sidebar, Slider, Tabbar } from "../model/nodes"
 import { Browser, browserWith } from "./browser"
 import { alive, Host } from "./host"
 import { renderPlugin } from "./plugin-host"
@@ -125,6 +125,59 @@ it.live("draws tabs of a plugin: only the open tab, and a click on a tab goes to
       yield* settle
       expect(yield* count("grid")).toBe(1)
       expect(yield* count("kanban")).toBe(0)
+    }))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+    expect(element.innerHTML).toBe("")
+  }))
+
+it.live("draws a sidebar and a layout of a plugin: a click on an item goes to the plugin, and the plugin hides a cell", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.width = "1100px"
+    element.style.height = "600px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const ui = yield* uiState
+      const tree = Layout.make({
+        id: "frame",
+        direction: "cols",
+        cells: [
+          {
+            size: 500,
+            child: Sidebar.make({
+              id: "side",
+              items: [
+                { label: "Issues", icon: "dxi dxi-table", child: Grid.make({ id: "issues", columns: [{ id: "title", header: "Title" }], rows: ISSUES }) },
+                { label: "Points", icon: "dxi dxi-tune", child: Slider.make({ id: "points", value: 3 }) }
+              ]
+            })
+          },
+          { header: "Board", child: Kanban.make({ id: "board", field: "status", labelField: "title", columns: [{ id: "todo", label: "To do" }, { id: "doing", label: "Doing" }], rows: ISSUES }) }
+        ]
+      })
+      yield* bindTree(tree).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, pluginEnd)
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      yield* settle
+      const count = (kind: string) => Effect.map(SubscriptionRef.get(alive), (live) => live.get(kind) ?? 0)
+      expect(yield* count("grid")).toBe(1)
+      expect(yield* count("kanban")).toBe(1)
+      expect(element.querySelector<HTMLElement>(".dhx_grid")!.getBoundingClientRect().height).toBeGreaterThan(300)
+      // A click on the item Points of the sidebar, as the user does.
+      const item = [...element.querySelectorAll<HTMLElement>(".dhx_nav-menu-button, .dhx_sidebar-button, [role=menuitem], button")].find((one) => one.textContent?.includes("Points"))!
+      item.click()
+      yield* settle
+      expect(((yield* ui.full).state as Record<string, { value?: string }>)["side"]?.value).toBe("points")
+      expect(yield* count("grid")).toBe(0)
+      expect(yield* count("slider")).toBe(1)
+      // The plugin hides the cell of the Kanban.
+      yield* ui.run("frame", "hide", ["board"])
+      yield* settle
+      const boardCell = element.querySelector<HTMLElement>("[data-cell-id=board], .dhx_layout-cell [data-drop-area]")
+      expect(boardCell === null || boardCell.offsetParent === null || boardCell.getBoundingClientRect().width === 0).toBe(true)
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
     expect(element.innerHTML).toBe("")

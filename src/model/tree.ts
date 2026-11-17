@@ -2,7 +2,7 @@ import { Effect, Schema, type Scope, Stream, SubscriptionRef } from "effect"
 import { GANTT_ACTIONS, type GanttModel } from "./gantt"
 import { GRID_ACTIONS, type GridColumn, type GridModel } from "./grid"
 import { VALUE_ACTIONS, type ValueModel, valueModel } from "./inputs"
-import type { Input } from "./model"
+import { changesOf, type Entry, history, type Input, input, recordInput } from "./model"
 import { type KanbanColumn, type KanbanLane, KANBAN_ACTIONS, type KanbanModel } from "./kanban"
 import type { Row } from "../core/rows"
 import { SCHEDULER_ACTIONS, type SchedulerModel } from "./scheduler"
@@ -81,7 +81,52 @@ export type FrameNode = { readonly _tag: "column" | "row"; readonly id: string; 
  * the state of a model under the id of the tabbar (`tabsModel`), and the page draws only that tab.
  */
 export type TabbarNode = { readonly _tag: "tabbar"; readonly id: string; readonly size?: number | undefined; readonly tabs: ReadonlyArray<{ readonly label: string; readonly child: UiNode }> }
-export type UiNode = WidgetNode | FrameNode | TabbarNode
+/** A Sidebar on the left, with an item for each child, and the child of the chosen item on the right. The chosen item is the state of a model, as for tabs. */
+export type SidebarNode = {
+  readonly _tag: "sidebar"
+  readonly id: string
+  readonly size?: number | undefined
+  /** The width of the sidebar, in px. */
+  readonly width?: number | undefined
+  readonly items: ReadonlyArray<{ readonly label: string; readonly icon?: string | undefined; readonly child: UiNode }>
+}
+/**
+ * A DHTMLX Layout: a cell for each child, from top to bottom (`rows`) or from left to right (`cols`).
+ * The id of a cell is the id of its child. Which cells are hidden is the state of a model (`cellsModel`).
+ */
+export type LayoutNode = {
+  readonly _tag: "layout"
+  readonly id: string
+  readonly size?: number | undefined
+  readonly direction: "rows" | "cols"
+  readonly type?: "line" | "wide" | "space" | "none" | undefined
+  readonly cells: ReadonlyArray<{
+    readonly child: UiNode
+    readonly header?: string | undefined
+    /** A size in px or %, such as `240` or `"30%"`, along the layout. */
+    readonly size?: number | string | undefined
+    readonly resizable?: boolean | undefined
+    readonly collapsable?: boolean | undefined
+  }>
+}
+export type UiNode = WidgetNode | FrameNode | TabbarNode | SidebarNode | LayoutNode
+
+/** The children of a node: of a frame, of tabs, of a sidebar, of a layout. A widget has none. */
+export const childrenOf = (node: UiNode): ReadonlyArray<UiNode> => {
+  switch (node._tag) {
+    case "column":
+    case "row":
+      return node.children
+    case "tabbar":
+      return node.tabs.map((tab) => tab.child)
+    case "sidebar":
+      return node.items.map((item) => item.child)
+    case "layout":
+      return node.cells.map((cell) => cell.child)
+    default:
+      return []
+  }
+}
 
 export const UiNodeSchema: Schema.Codec<UiNode> = Schema.Union([
   WidgetNodeSchema,
@@ -96,6 +141,27 @@ export const UiNodeSchema: Schema.Codec<UiNode> = Schema.Union([
     id: Schema.String,
     size: Size,
     tabs: Schema.Array(Schema.Struct({ label: Schema.String, child: Schema.suspend((): Schema.Codec<UiNode> => UiNodeSchema) }))
+  }),
+  Schema.Struct({
+    _tag: Schema.Literal("sidebar"),
+    id: Schema.String,
+    size: Size,
+    width: Schema.optional(Schema.Number),
+    items: Schema.Array(Schema.Struct({ label: Schema.String, icon: Schema.optional(Schema.String), child: Schema.suspend((): Schema.Codec<UiNode> => UiNodeSchema) }))
+  }),
+  Schema.Struct({
+    _tag: Schema.Literal("layout"),
+    id: Schema.String,
+    size: Size,
+    direction: Schema.Literals(["rows", "cols"]),
+    type: Schema.optional(Schema.Literals(["line", "wide", "space", "none"])),
+    cells: Schema.Array(Schema.Struct({
+      child: Schema.suspend((): Schema.Codec<UiNode> => UiNodeSchema),
+      header: Schema.optional(Schema.String),
+      size: Schema.optional(Schema.Union([Schema.Number, Schema.String])),
+      resizable: Schema.optional(Schema.Boolean),
+      collapsable: Schema.optional(Schema.Boolean)
+    }))
   })
 ]) as never
 
@@ -116,6 +182,61 @@ export const row = (id: string, children: ReadonlyArray<UiNode>, size?: number):
 /** The model of a tabbar: the id of the open tab, one of `ids`. Another id is refused. */
 export const tabsModel = (ids: ReadonlyArray<string>, value?: Input<string>) =>
   valueModel<string>(value === undefined ? {} : { value }, ids[0] ?? "", { accepts: (id) => ids.includes(id) })
+
+/** A sidebar in the page, with the model of its chosen item (`tabsModel` of the ids of its children) under `id`. */
+export const sidebarNode = (id: string, model: ValueModel<string>, items: SidebarNode["items"], config: { readonly width?: number; readonly size?: number } = {}) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(id, partOf(model, VALUE_ACTIONS))
+    return { _tag: "sidebar", id, items, ...config } satisfies SidebarNode
+  })
+
+export type CellsModel = {
+  /** The ids of the cells that are hidden. */
+  readonly hidden: SubscriptionRef.SubscriptionRef<ReadonlyArray<string>>
+  /** Hides a cell, and the cells next to it take its room. A cell that is not there is refused. */
+  readonly hide: (id: string) => Effect.Effect<boolean>
+  readonly show: (id: string) => Effect.Effect<boolean>
+  readonly recent: Effect.Effect<ReadonlyArray<Entry>>
+  readonly snapshot: Effect.Effect<{ readonly hidden: ReadonlyArray<string> }>
+  readonly changes: Stream.Stream<void>
+}
+
+/** The actions of a `CellsModel`, by name. */
+export const CELLS_ACTIONS = ["hide", "show"] as const satisfies ReadonlyArray<keyof CellsModel>
+
+/** The model of a layout: which of the cells `ids` are hidden. */
+export const cellsModel = (ids: ReadonlyArray<string>, options: { readonly hidden?: Input<ReadonlyArray<string>>; readonly history?: number } = {}): Effect.Effect<CellsModel, never, Scope.Scope> =>
+  Effect.gen(function* () {
+    const hidden = yield* input<ReadonlyArray<string>>(options.hidden, [])
+    const log = yield* history(options.history ?? 0)
+    yield* recordInput(log, "hidden", hidden)
+    const toggle = (name: "hide" | "show", id: string) =>
+      Effect.gen(function* () {
+        if (!ids.includes(id)) return false
+        yield* log.record({ _tag: "action", name, value: id })
+        const now = yield* SubscriptionRef.get(hidden)
+        if (now.includes(id) === (name === "hide")) return true
+        yield* SubscriptionRef.set(hidden, name === "hide" ? [...now, id] : now.filter((one) => one !== id))
+        return true
+      })
+    return {
+      hidden,
+      hide: (id) => toggle("hide", id),
+      show: (id) => toggle("show", id),
+      recent: log.recent,
+      snapshot: Effect.map(SubscriptionRef.get(hidden), (now) => ({ hidden: now })),
+      changes: changesOf(hidden)
+    }
+  })
+
+/** A layout in the page, with its model under `id`. */
+export const layoutNode = (id: string, model: CellsModel, config: Omit<LayoutNode, "_tag" | "id">) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(id, partOf(model, CELLS_ACTIONS))
+    return { _tag: "layout", id, ...config } satisfies LayoutNode
+  })
 
 /** A tabbar in the page, with its model under `id`. */
 export const tabbarNode = (id: string, model: ValueModel<string>, tabs: TabbarNode["tabs"], size?: number) =>

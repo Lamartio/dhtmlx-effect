@@ -2,8 +2,8 @@ import { Effect, Option, Schema, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteGantt, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
-import { TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
+import { type Host as PluginHost, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
+import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
 import { dataCollection, escapeHtml, renderDataView, renderGrid, renderList, renderTree, treeCollection } from "./data"
 import { renderGantt } from "./gantt"
@@ -12,6 +12,8 @@ import { renderCalendar, renderColorpicker, renderCombobox, renderSlider, render
 import { renderKanban } from "./kanban"
 import { reporting } from "./problems"
 import { renderScheduler } from "./scheduler"
+import { layout } from "./layout"
+import { sidebar } from "./sidebar"
 import { tabbar } from "./tabbar"
 
 // A node decoded from JSON has no key with `undefined` in it, so its config fits the options of a
@@ -45,6 +47,10 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
       }
       case "tabbar":
         return yield* tabsOf(page, node, children)
+      case "sidebar":
+        return yield* sidebarOf(page, node, children)
+      case "layout":
+        return yield* layoutOf(page, node, children)
       case "calendar":
         return yield* renderCalendar(yield* remoteValue<string | undefined>(page, node.id, undefined))
       case "timepicker":
@@ -91,6 +97,53 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
     }
   })
 
+/**
+ * The shape of a node: all of it but its size and its children, where a child is only its id. A node
+ * with the same shape keeps its widget; its children change in place.
+ */
+const shapeOf = (node: UiNode) =>
+  JSON.stringify({ ...node, size: undefined }, (key, value: unknown) =>
+    key === "child" ? (value as UiNode).id : key === "children" ? (value as ReadonlyArray<UiNode>).map((one) => one.id) : value)
+
+/**
+ * A ref for each child of a node, by id, that follows the children as they change, so the part of
+ * a child changes in place.
+ */
+const childRefs = (node: UiNode, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>) =>
+  Effect.gen(function* () {
+    const refs = new Map<string, SubscriptionRef.SubscriptionRef<UiNode>>()
+    for (const one of childrenOf(node)) refs.set(one.id, yield* SubscriptionRef.make(one))
+    yield* SubscriptionRef.changes(children).pipe(
+      Stream.runForEach((all) =>
+        Effect.forEach(all, (one) => {
+          const ref = refs.get(one.id)
+          return ref === undefined ? Effect.void : Effect.flatMap(SubscriptionRef.get(ref), (now) => (stableJson(now) === stableJson(one) ? Effect.void : SubscriptionRef.set(ref, one)))
+        }, { discard: true })),
+      reporting(`The children of ${node.id} of the plugin`),
+      Effect.forkScoped
+    )
+    return refs
+  })
+
+/**
+ * The chosen child of tabs or a sidebar, both ways: a click sets `active`, which goes to the plugin
+ * as `set`; the value of the plugin comes back into `active`, also after a refusal.
+ */
+const chosen = (page: PluginHost, id: string, first: string) =>
+  Effect.gen(function* () {
+    const model = yield* remoteValue<string>(page, id, first)
+    const active = yield* SubscriptionRef.make(yield* SubscriptionRef.get(model.value))
+    yield* SubscriptionRef.changes(model.value).pipe(
+      Stream.runForEach((value) => Effect.flatMap(SubscriptionRef.get(active), (now) => (now === value ? Effect.void : SubscriptionRef.set(active, value)))),
+      Effect.forkScoped
+    )
+    yield* SubscriptionRef.changes(active).pipe(
+      Stream.runForEach((value) => Effect.flatMap(SubscriptionRef.get(model.value), (now) => (now === value ? Effect.void : model.set(value)))),
+      Effect.forkScoped
+    )
+    return active
+  })
+
 /** A part that fills its host as a flex column with no scroll, as the root does: for the pane of a tab. */
 const fill = <A, E, R>(part: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
@@ -101,40 +154,56 @@ const fill = <A, E, R>(part: Effect.Effect<A, E, R>) =>
     return yield* part
   })
 
-/**
- * A Tabbar for a tabbar node: the open tab is the value of the model in the plugin. A click on a tab
- * is the action `set`; a refused one opens the tab before again. Each tab draws its child as a node,
- * and a change in a child goes in place.
- */
+/** A Tabbar for a tabbar node: only the open tab is drawn. */
 const tabsOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "tabbar" }>, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>) =>
   Effect.gen(function* () {
-    const ids = node.tabs.map((tab) => tab.child.id)
-    const model = yield* remoteValue<string>(page, node.id, ids[0] ?? "")
-    const items = new Map<string, SubscriptionRef.SubscriptionRef<UiNode>>()
-    for (const tab of node.tabs) items.set(tab.child.id, yield* SubscriptionRef.make(tab.child))
-    yield* SubscriptionRef.changes(children).pipe(
-      Stream.runForEach((all) =>
-        Effect.forEach(all, (one) => {
-          const ref = items.get(one.id)
-          return ref === undefined ? Effect.void : Effect.flatMap(SubscriptionRef.get(ref), (now) => (stableJson(now) === stableJson(one) ? Effect.void : SubscriptionRef.set(ref, one)))
-        }, { discard: true })),
-      reporting(`The tabs ${node.id} of the plugin`),
-      Effect.forkScoped
-    )
-    // The Tabbar sets `active` on a click: that goes to the plugin, and the value of the plugin comes back into it.
-    const active = yield* SubscriptionRef.make(yield* SubscriptionRef.get(model.value))
-    yield* SubscriptionRef.changes(model.value).pipe(
-      Stream.runForEach((id) => Effect.flatMap(SubscriptionRef.get(active), (now) => (now === id ? Effect.void : SubscriptionRef.set(active, id)))),
-      Effect.forkScoped
-    )
-    yield* SubscriptionRef.changes(active).pipe(
-      Stream.runForEach((id) => Effect.flatMap(SubscriptionRef.get(model.value), (now) => (now === id ? Effect.void : model.set(id)))),
-      Effect.forkScoped
-    )
+    const refs = yield* childRefs(node, children)
     return yield* tabbar({
-      active,
-      items: node.tabs.map((tab) => ({ id: tab.child.id, label: tab.label, part: fill(nodePart(page, items.get(tab.child.id)!, "column")) }))
+      active: yield* chosen(page, node.id, node.tabs[0]?.child.id ?? ""),
+      items: node.tabs.map((tab) => ({ id: tab.child.id, label: tab.label, part: fill(nodePart(page, refs.get(tab.child.id)!, "column")) }))
     })
+  })
+
+/** A Sidebar for a sidebar node: only the chosen item is drawn. */
+const sidebarOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "sidebar" }>, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>) =>
+  Effect.gen(function* () {
+    const refs = yield* childRefs(node, children)
+    return yield* sidebar({
+      active: yield* chosen(page, node.id, node.items[0]?.child.id ?? ""),
+      ...(node.width === undefined ? {} : { width: node.width }),
+      items: node.items.map((item) => ({
+        id: item.child.id,
+        label: item.label,
+        ...(item.icon === undefined ? {} : { icon: item.icon }),
+        part: fill(nodePart(page, refs.get(item.child.id)!, "column"))
+      }))
+    })
+  })
+
+/** A Layout for a layout node: a cell for each child, and the hidden cells of the model in the plugin. */
+const layoutOf = (page: PluginHost, node: Extract<UiNode, { readonly _tag: "layout" }>, children: SubscriptionRef.SubscriptionRef<ReadonlyArray<UiNode>>) =>
+  Effect.gen(function* () {
+    const refs = yield* childRefs(node, children)
+    const model = yield* remoteModel(page, node.id, { hidden: [] as ReadonlyArray<string> }, CELLS_ACTIONS)
+    const cells = []
+    for (const cell of node.cells) {
+      const id = cell.child.id
+      const hidden = yield* SubscriptionRef.make((yield* SubscriptionRef.get(model.hidden)).includes(id))
+      yield* SubscriptionRef.changes(model.hidden).pipe(
+        Stream.runForEach((all) => Effect.flatMap(SubscriptionRef.get(hidden), (now) => (now === all.includes(id) ? Effect.void : SubscriptionRef.set(hidden, all.includes(id))))),
+        Effect.forkScoped
+      )
+      cells.push({
+        id,
+        hidden,
+        part: fill(nodePart(page, refs.get(id)!, node.direction === "rows" ? "column" : "row")),
+        ...(cell.header === undefined ? {} : { header: cell.header }),
+        ...(cell.size === undefined ? {} : node.direction === "rows" ? { height: cell.size } : { width: cell.size }),
+        ...(cell.resizable === undefined ? {} : { resizable: cell.resizable }),
+        ...(cell.collapsable === undefined ? {} : { collapsable: cell.collapsable })
+      })
+    }
+    return yield* layout({ direction: node.direction, cells, ...(node.type === undefined ? {} : { type: node.type }) })
   })
 
 /**
@@ -156,10 +225,8 @@ const nodePart = (page: PluginHost, item: SubscriptionRef.SubscriptionRef<UiNode
           element.style.position = "relative"
           element.style.display = "flex"
           element.style.flexDirection = "column"
-          if ("children" in node) yield* SubscriptionRef.set(children, node.children)
-          if (node._tag === "tabbar") yield* SubscriptionRef.set(children, node.tabs.map((tab) => tab.child))
-          // The shape of a node is all but its children (and the size): for tabs, their ids and labels.
-          const next = stableJson({ ...node, children: undefined, size: undefined, tabs: node._tag === "tabbar" ? node.tabs.map((tab) => [tab.child.id, tab.label]) : undefined })
+          yield* SubscriptionRef.set(children, childrenOf(node))
+          const next = shapeOf(node)
           if (next === shape) return
           shape = next
           yield* show(widgetOf(page, node, children).pipe(Effect.provideService(Host, element)))

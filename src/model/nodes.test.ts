@@ -1,7 +1,7 @@
 import { it } from "@effect/vitest"
 import { Effect, Schema, SubscriptionRef } from "effect"
 import { expect } from "vitest"
-import { bindTree, Column, Grid, Kanban, Row, Slider, Tabbar, type Ui, UiSchema } from "./nodes"
+import { bindTree, Column, Grid, Kanban, Layout, Row, Sidebar, Slider, Tabbar, type Ui, UiSchema } from "./nodes"
 import { TREE_KEY } from "./tree"
 import { UiState, uiState } from "./ui-state"
 
@@ -66,4 +66,30 @@ it.effect("keeps the open tab of a tabbar as a model, and refuses a tab that is 
     yield* SubscriptionRef.set(trees, tabs())
     yield* settle
     expect((yield* state())["tabs"]).toEqual({ value: "board" })
+  }).pipe(Effect.scoped))
+
+it.effect("keeps the chosen item of a sidebar and the hidden cells of a layout as models", () =>
+  Effect.gen(function* () {
+    const ui = yield* uiState
+    const tree = Layout.make({
+      id: "frame",
+      direction: "cols",
+      hidden: ["board"],
+      cells: [
+        { child: Sidebar.make({ id: "side", items: [{ label: "Issues", icon: "dxi dxi-table", child: grid() }, { label: "Points", child: Slider.make({ id: "points", value: 2 }) }] }), size: 300 },
+        { child: board, header: "Board" }
+      ]
+    })
+    yield* bindTree(tree).pipe(Effect.provideService(UiState, ui))
+    yield* settle
+    const state = () => Effect.map(ui.full, (full) => full.state as Record<string, any>)
+    expect((yield* state())["side"]).toEqual({ value: "issues" })
+    expect((yield* state())["frame"]).toEqual({ hidden: ["board"] })
+    expect((yield* state())[TREE_KEY].cells[0].child.items[1]).toEqual({ label: "Points", child: { _tag: "slider", id: "points" } })
+    expect(yield* ui.run("side", "set", ["points"])).toBe(true)
+    expect(yield* ui.run("frame", "show", ["board"])).toBe(true)
+    expect(yield* ui.run("frame", "hide", ["nothing"])).toBe(false)
+    yield* settle
+    expect((yield* state())["side"]).toEqual({ value: "points" })
+    expect((yield* state())["frame"]).toEqual({ hidden: [] })
   }).pipe(Effect.scoped))
