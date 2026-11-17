@@ -7,17 +7,22 @@
  *
  * Run: `bun run demo`, then open http://localhost:4100.
  */
+import { Schema } from "effect"
 import { watch } from "node:fs"
 import { join } from "node:path"
 import host from "./host.html"
 import plugin from "./plugin.html"
+import { UiSchema } from "../src/model/nodes"
 
 const HOST_PORT = Number(process.env["HOST_PORT"] ?? 4100)
 const PLUGIN_PORT = Number(process.env["PLUGIN_PORT"] ?? 4101)
 const FILE = join(import.meta.dir, "ui.ts")
 
-/** The file as it is now: imported again, with a new query, so Bun does not give the old module. */
-const load = async () => JSON.stringify((await import(`${FILE}?v=${Date.now()}`)).default)
+/**
+ * The file as it is now, as JSON from its Schema: imported again, with a new query, so Bun does not
+ * give the old module. A node that `.make` refuses stops the import, and the plugin keeps the last UI.
+ */
+const load = async () => JSON.stringify(Schema.encodeSync(UiSchema)((await import(`${FILE}?v=${Date.now()}`)).default))
 
 let current = await load()
 const listeners = new Set<(data: string) => void>()

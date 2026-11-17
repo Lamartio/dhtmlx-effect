@@ -43,22 +43,22 @@ const KanbanColumnSchema = Schema.Struct({
   collapsed: Schema.optional(Schema.Boolean)
 })
 
-/** A node of a widget: its kind, its id and its config. */
-export const WidgetNodeSchema = Schema.Union([
-  Schema.TaggedStruct("calendar", { id: Schema.String, size: Size }),
-  Schema.TaggedStruct("timepicker", { id: Schema.String, size: Size }),
-  Schema.TaggedStruct("slider", { id: Schema.String, size: Size, min: Schema.optional(Schema.Number), max: Schema.optional(Schema.Number), step: Schema.optional(Schema.Number), label: Schema.optional(Schema.String) }),
-  Schema.TaggedStruct("colorpicker", { id: Schema.String, size: Size }),
-  Schema.TaggedStruct("combobox", { id: Schema.String, size: Size, options: Schema.Array(Schema.Struct({ value: Schema.String, label: Schema.String })), label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
-  Schema.TaggedStruct("grid", { id: Schema.String, size: Size, columns: Schema.Array(GridColumnSchema) }),
+/** The node of each widget as it goes to the page: its kind, its id and its config, with no data. */
+export const WireNodes = {
+  calendar: Schema.TaggedStruct("calendar", { id: Schema.String, size: Size }),
+  timepicker: Schema.TaggedStruct("timepicker", { id: Schema.String, size: Size }),
+  slider: Schema.TaggedStruct("slider", { id: Schema.String, size: Size, min: Schema.optional(Schema.Number), max: Schema.optional(Schema.Number), step: Schema.optional(Schema.Number), label: Schema.optional(Schema.String) }),
+  colorpicker: Schema.TaggedStruct("colorpicker", { id: Schema.String, size: Size }),
+  combobox: Schema.TaggedStruct("combobox", { id: Schema.String, size: Size, options: Schema.Array(Schema.Struct({ value: Schema.String, label: Schema.String })), label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
+  grid: Schema.TaggedStruct("grid", { id: Schema.String, size: Size, columns: Schema.Array(GridColumnSchema) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */
-  Schema.TaggedStruct("list", { id: Schema.String, size: Size, fields: Schema.Array(Schema.String), itemHeight: Schema.optional(Schema.Number) }),
-  Schema.TaggedStruct("dataview", { id: Schema.String, size: Size, fields: Schema.Array(Schema.String), itemsInRow: Schema.optional(Schema.Number) }),
+  list: Schema.TaggedStruct("list", { id: Schema.String, size: Size, fields: Schema.Array(Schema.String), itemHeight: Schema.optional(Schema.Number) }),
+  dataview: Schema.TaggedStruct("dataview", { id: Schema.String, size: Size, fields: Schema.Array(Schema.String), itemsInRow: Schema.optional(Schema.Number) }),
   /** A Tree shows the `value` of a row. */
-  Schema.TaggedStruct("tree", { id: Schema.String, size: Size }),
-  Schema.TaggedStruct("gantt", { id: Schema.String, size: Size }),
-  Schema.TaggedStruct("scheduler", { id: Schema.String, size: Size }),
-  Schema.TaggedStruct("kanban", {
+  tree: Schema.TaggedStruct("tree", { id: Schema.String, size: Size }),
+  gantt: Schema.TaggedStruct("gantt", { id: Schema.String, size: Size }),
+  scheduler: Schema.TaggedStruct("scheduler", { id: Schema.String, size: Size }),
+  kanban: Schema.TaggedStruct("kanban", {
     id: Schema.String,
     size: Size,
     field: Schema.String,
@@ -67,7 +67,10 @@ export const WidgetNodeSchema = Schema.Union([
     labelField: Schema.String,
     descriptionField: Schema.optional(Schema.String)
   })
-])
+} as const
+
+/** A node of a widget: its kind, its id and its config. */
+export const WidgetNodeSchema = Schema.Union(Object.values(WireNodes))
 export type WidgetNode = typeof WidgetNodeSchema.Type
 
 /** A frame: its children from top to bottom (`column`) or from left to right (`row`). */

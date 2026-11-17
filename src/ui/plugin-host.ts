@@ -118,7 +118,7 @@ const nodePart = (page: PluginHost, item: SubscriptionRef.SubscriptionRef<UiNode
     )
   })
 
-/** Draws the UI of the plugin behind `page` in the host. */
+/** Draws the UI of the plugin behind `page` in the host, filling it. */
 export const renderPlugin = (page: PluginHost): Widget =>
   Effect.gen(function* () {
     const roots = yield* SubscriptionRef.make<ReadonlyArray<UiNode>>([])
@@ -129,9 +129,12 @@ export const renderPlugin = (page: PluginHost): Widget =>
       reporting("The tree of the plugin"),
       Effect.forkScoped
     )
+    // The root fills its host as a flex column, with no scroll: the app sizes the host (in the demo,
+    // the whole window), and each node takes its `size` or a part of what is left.
     const host = yield* Host
     host.style.display = "flex"
     host.style.flexDirection = "column"
     host.style.minHeight = "0"
+    host.style.overflow = "hidden"
     yield* keyed(roots, (node) => node.id, (node) => nodePart(page, node, "column"))
   })

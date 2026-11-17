@@ -3,31 +3,31 @@
  * their state, and runs each action of the page. The sender tells it each new version of `ui.ts`
  * (an EventSource), and gets each action in its log.
  */
-import { Effect, Layer, Queue, Stream } from "effect"
+import { Effect, Layer, Queue, Schema, Stream } from "effect"
 import { servePlugin } from "../src/model/remote"
-import { publishTree } from "../src/model/tree"
+import { bindTree, type Ui, UiSchema } from "../src/model/nodes"
 import { acceptHost } from "../src/model/transport"
 import { UiState, uiState } from "../src/model/ui-state"
-import { plugin, type Spec } from "./spec"
 
 const HOST = String(new URLSearchParams(location.search).get("host") ?? "http://localhost:4100")
+
+const decode = Schema.decodeUnknownSync(UiSchema)
 
 const log = (line: unknown) => void fetch("/log", { method: "POST", body: JSON.stringify(line) })
 
 const program = Effect.gen(function* () {
   const ui = yield* UiState
-  const { tree, load } = yield* plugin
-  yield* publishTree(tree)
-  const versions = Stream.callback<Spec>((queue) =>
+  const versions = Stream.callback<Ui>((queue) =>
     Effect.acquireRelease(
       Effect.sync(() => {
         const source = new EventSource("/ui")
-        source.onmessage = (event) => Effect.runFork(Queue.offer(queue, JSON.parse(event.data) as Spec))
+        source.onmessage = (event) => Effect.runFork(Queue.offer(queue, decode(JSON.parse(event.data))))
         return source
       }),
       (source) => Effect.sync(() => source.close())
     ))
-  yield* versions.pipe(Stream.runForEach(load), Effect.forkScoped)
+  // Each version of ui.ts: the models stay by id, and only what changed goes to the page.
+  yield* bindTree(versions)
   const channel = yield* acceptHost(HOST)
   // Each message of the page goes into the log of the sender, then to the plugin.
   yield* servePlugin(ui, { ...channel, messages: channel.messages.pipe(Stream.tap((message) => Effect.sync(() => log(message)))) })
