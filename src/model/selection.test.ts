@@ -16,7 +16,7 @@ it.effect("selects a row of a list, and refuses a row that is not there", () =>
     const model = yield* selectionModel({ rows: ROWS })
     yield* model.select("notes")
     yield* model.select("lost")
-    expect(yield* model.snapshot).toEqual({ selected: "notes", rows: ["docs", "intro", "guide", "notes"] })
+    expect(yield* model.snapshot).toEqual({ selected: "notes", rows: ROWS })
   }).pipe(Effect.scoped))
 
 it.effect("selects any row when it has no rows, as the renderer checks them", () =>

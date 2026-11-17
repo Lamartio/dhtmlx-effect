@@ -1,5 +1,5 @@
-import { Effect, type Scope, SubscriptionRef } from "effect"
-import { type Entry, history, type Input, input, recordInput } from "./model"
+import { Effect, type Scope, type Stream, SubscriptionRef } from "effect"
+import { changesOf, type Entry, history, type Input, input, recordInput } from "./model"
 
 /** One task of a plan. Days are `YYYY-MM-DD`. */
 export type Task = {
@@ -52,6 +52,8 @@ export type GanttModel = {
   readonly removeTask: (id: string) => Effect.Effect<void>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<GanttState>
+  /** One `void` on each change of the state: see `changesOf`. */
+  readonly changes: Stream.Stream<void>
 }
 
 /** The actions of a `GanttModel`, by name. */
@@ -104,6 +106,7 @@ export const ganttModel = (options: GanttModelOptions): Effect.Effect<GanttModel
           yield* SubscriptionRef.update(tasks, (all) => planWith(all, { remove: id }))
         }),
       recent: log.recent,
-      snapshot: Effect.all({ zoom: SubscriptionRef.get(zoom), tasks: SubscriptionRef.get(tasks) })
+      snapshot: Effect.all({ zoom: SubscriptionRef.get(zoom), tasks: SubscriptionRef.get(tasks) }),
+      changes: changesOf(zoom, tasks)
     }
   })

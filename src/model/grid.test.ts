@@ -14,7 +14,7 @@ const ROWS = [{ id: "a" }, { id: "b" }, { id: "c" }]
 it.effect("starts with no row, no sort and no filter", () =>
   Effect.gen(function* () {
     const model = yield* gridModel({ columns: COLUMNS, rows: ROWS })
-    expect(yield* model.snapshot).toEqual({ selected: undefined, sort: undefined, filters: {}, rows: ["a", "b", "c"] })
+    expect(yield* model.snapshot).toEqual({ selected: undefined, sort: undefined, filters: {}, rows: ROWS })
   }).pipe(Effect.scoped))
 
 it.effect("selects a row, and refuses a row that is not there", () =>
@@ -42,7 +42,7 @@ it.effect("follows the rows of a SubscriptionRef that it is given", () =>
     expect((yield* model.snapshot).selected).toBe(undefined)
     yield* SubscriptionRef.set(rows, [...ROWS, { id: "d" }])
     yield* model.select("d")
-    expect(yield* model.snapshot).toEqual({ selected: "d", sort: undefined, filters: {}, rows: ["a", "b", "c", "d"] })
+    expect(yield* model.snapshot).toEqual({ selected: "d", sort: undefined, filters: {}, rows: [...ROWS, { id: "d" }] })
   }).pipe(Effect.scoped))
 
 it.effect("turns the order around on a second sort of the same column", () =>

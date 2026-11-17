@@ -1,6 +1,6 @@
-import { Effect, type Scope, SubscriptionRef } from "effect"
+import { Effect, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
-import { type Entry, history, type Input, input, recordInput } from "./model"
+import { changesOf, type Entry, history, type Input, input, recordInput } from "./model"
 
 /**
  * The selection that the Grid, the List, the DataView and the Tree share: the id of the chosen row,
@@ -23,8 +23,8 @@ export const selectOn = (
 
 export type SelectionState = {
   readonly selected: string | undefined
-  /** The ids of the rows, when the model has the rows. */
-  readonly rows?: ReadonlyArray<string>
+  /** The rows, when the model has them: a renderer in another frame draws them. */
+  readonly rows?: ReadonlyArray<Row>
 }
 
 export type SelectionModel = {
@@ -33,6 +33,8 @@ export type SelectionModel = {
   readonly select: (id: string | undefined) => Effect.Effect<void>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<SelectionState>
+  /** One `void` on each change of the state: see `changesOf`. */
+  readonly changes: Stream.Stream<void>
 }
 
 /** The actions of a `SelectionModel`, by name. */
@@ -52,15 +54,17 @@ const parts = (options: SelectionOptions) =>
     const selected = yield* input(options.selected, undefined)
     const log = yield* history(options.history ?? 0)
     yield* recordInput(log, "selected", selected)
-    const ids = rows === undefined ? Effect.succeed(undefined) : Effect.map(SubscriptionRef.get(rows), (all) => all.map((row) => row.id))
-    return { rows, selected, log, ids }
+    const ids = rows === undefined ? Effect.succeed(undefined) : SubscriptionRef.get(rows)
+    const changes = rows === undefined ? changesOf(selected) : changesOf(selected, rows)
+    return { rows, selected, log, ids, changes }
   })
 
 /** The model of a List or a DataView: only the selected row. */
 export const selectionModel = (options: SelectionOptions = {}): Effect.Effect<SelectionModel, never, Scope.Scope> =>
   Effect.gen(function* () {
-    const { rows, selected, log, ids } = yield* parts(options)
+    const { rows, selected, log, ids, changes } = yield* parts(options)
     return {
+      changes,
       selected,
       select: selectOn(log, rows, selected),
       recent: log.recent,
@@ -81,6 +85,8 @@ export type TreeModel = Omit<SelectionModel, "snapshot"> & {
   readonly expand: (id: string) => Effect.Effect<void>
   readonly collapse: (id: string) => Effect.Effect<void>
   readonly snapshot: Effect.Effect<TreeState>
+  /** One `void` on each change of the state: see `changesOf`. */
+  readonly changes: Stream.Stream<void>
 }
 
 /** The actions of a `TreeModel`, by name. */
@@ -89,7 +95,7 @@ export const TREE_ACTIONS = ["select", "expand", "collapse"] as const satisfies 
 /** The model of a Tree: the selected row and the open folders. A row goes under the row of its `parent`. */
 export const treeModel = (options: SelectionOptions & { readonly expanded?: Input<ReadonlyArray<string>> } = {}): Effect.Effect<TreeModel, never, Scope.Scope> =>
   Effect.gen(function* () {
-    const { rows, selected, log, ids } = yield* parts(options)
+    const { rows, selected, log, ids, changes } = yield* parts(options)
     const expanded = yield* input<ReadonlyArray<string>>(options.expanded, [])
     yield* recordInput(log, "expanded", expanded)
     const isFolder = (id: string) =>
@@ -103,6 +109,7 @@ export const treeModel = (options: SelectionOptions & { readonly expanded?: Inpu
         yield* SubscriptionRef.set(expanded, name === "expand" ? [...now, id] : now.filter((one) => one !== id))
       })
     return {
+      changes: Stream.merge(changes, changesOf(expanded)),
       selected,
       expanded,
       select: selectOn(log, rows, selected),

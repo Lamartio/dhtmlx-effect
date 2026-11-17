@@ -1,6 +1,6 @@
 import { Effect, PubSub, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
-import { type Entry, history, type Input, input, recordInput } from "./model"
+import { changesOf, type Entry, history, type Input, input, recordInput } from "./model"
 import { selectOn } from "./selection"
 
 export type GridColumn = {
@@ -35,8 +35,8 @@ export type GridState = {
   readonly sort: GridSort | undefined
   /** The text of each header filter that has one. */
   readonly filters: Readonly<Record<string, string>>
-  /** The ids of the rows, when the model has the rows. */
-  readonly rows?: ReadonlyArray<string>
+  /** The rows, when the model has them: a renderer in another frame draws them. */
+  readonly rows?: ReadonlyArray<{ readonly id: string }>
 }
 
 export type GridModel = {
@@ -55,6 +55,8 @@ export type GridModel = {
   readonly edit: (row: string, column: string, value: unknown) => Effect.Effect<void>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<GridState>
+  /** One `void` on each change of the state: see `changesOf`. */
+  readonly changes: Stream.Stream<void>
 }
 
 /** The actions of a `GridModel`, by name. */
@@ -121,7 +123,8 @@ export const gridModel = <R extends { readonly id: string }>(options: GridModelO
       recent: log.recent,
       snapshot: Effect.gen(function* () {
         const state = { selected: yield* SubscriptionRef.get(selected), sort: yield* SubscriptionRef.get(sort), filters: yield* SubscriptionRef.get(filters) }
-        return rows === undefined ? state : { ...state, rows: (yield* SubscriptionRef.get(rows)).map((row) => row.id) }
-      })
+        return rows === undefined ? state : { ...state, rows: yield* SubscriptionRef.get(rows) }
+      }),
+      changes: rows === undefined ? changesOf(selected, sort, filters) : changesOf(selected, sort, filters, rows)
     } satisfies GridModel
   })

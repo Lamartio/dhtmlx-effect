@@ -1,6 +1,6 @@
 import { Effect, PubSub, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
-import { type Entry, history, type Input, input, recordInput } from "./model"
+import { changesOf, type Entry, history, type Input, input, recordInput } from "./model"
 
 export type KanbanColumn = {
   readonly id: string
@@ -16,10 +16,10 @@ export type KanbanColumn = {
 /** A swimlane: a row across all the columns. */
 export type KanbanLane = { readonly id: string; readonly label: string; readonly collapsed?: boolean }
 
-export type KanbanState = {
+export type KanbanState<R extends Row> = {
   readonly selected: string | undefined
-  /** Each card as its column and its lane, by the id of its row. */
-  readonly cards: Readonly<Record<string, { readonly column: string; readonly lane?: string }>>
+  /** The rows: a renderer in another frame draws them. */
+  readonly rows: ReadonlyArray<R>
 }
 
 export type KanbanModel<R extends Row> = {
@@ -38,7 +38,9 @@ export type KanbanModel<R extends Row> = {
   /** Opens a card: it goes out in `opened`. A card that is not there changes nothing. */
   readonly open: (id: string) => Effect.Effect<void>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
-  readonly snapshot: Effect.Effect<KanbanState>
+  readonly snapshot: Effect.Effect<KanbanState<R>>
+  /** One `void` on each change of the state: see `changesOf`. */
+  readonly changes: Stream.Stream<void>
 }
 
 /** The actions of a `KanbanModel`, by name. */
@@ -101,10 +103,7 @@ export const kanbanModel = <R extends Row>(options: KanbanModelOptions<R>): Effe
           yield* log.record({ _tag: "event", name: "opened", value: id })
         }),
       recent: log.recent,
-      snapshot: Effect.gen(function* () {
-        const all = yield* SubscriptionRef.get(rows)
-        const cards = Object.fromEntries(all.map((row) => [row.id, { column: String(row[options.field]), ...(lane === undefined ? {} : { lane: String(row[lane]) }) }]))
-        return { selected: yield* SubscriptionRef.get(selected), cards }
-      })
+      snapshot: Effect.all({ selected: SubscriptionRef.get(selected), rows: SubscriptionRef.get(rows) }),
+      changes: changesOf(selected, rows)
     }
   })

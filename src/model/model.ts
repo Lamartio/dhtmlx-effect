@@ -74,3 +74,7 @@ export const dispatch = <M extends object>(model: M, actions: ReadonlyArray<keyo
   const run = typeof action === "function" ? (action as (...all: ReadonlyArray<unknown>) => unknown)(...args) : action
   return Effect.isEffect(run) ? Effect.as(run as Effect.Effect<unknown>, true) : Effect.succeed(false)
 }
+
+/** One `void` on each change of any of the refs (and one for each at the start): the signal that a state may have changed. */
+export const changesOf = (...refs: ReadonlyArray<SubscriptionRef.SubscriptionRef<any>>): Stream.Stream<void> =>
+  Stream.mergeAll(refs.map((ref) => SubscriptionRef.changes(ref)), { concurrency: "unbounded" }).pipe(Stream.as(undefined))

@@ -1,5 +1,5 @@
-import { Effect, type Scope, SubscriptionRef } from "effect"
-import { type Entry, history, type Input, input, recordInput } from "./model"
+import { Effect, type Scope, type Stream, SubscriptionRef } from "effect"
+import { changesOf, type Entry, history, type Input, input, recordInput } from "./model"
 
 /**
  * The models of the inputs of a form: Calendar, Timepicker, Slider, Colorpicker and Combobox. Each
@@ -14,6 +14,8 @@ export type ValueModel<A> = {
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   /** The state now, to compare, or to hash with `hashOf`. */
   readonly snapshot: Effect.Effect<{ readonly value: A }>
+  /** One `void` on each change of the state: see `changesOf`. */
+  readonly changes: Stream.Stream<void>
 }
 
 /** The actions of a `ValueModel`, by name. */
@@ -49,7 +51,8 @@ export const valueModel = <A>(
           if (!same(yield* SubscriptionRef.get(value), next)) yield* SubscriptionRef.set(value, next)
         }),
       recent: log.recent,
-      snapshot: Effect.map(SubscriptionRef.get(value), (now) => ({ value: now }))
+      snapshot: Effect.map(SubscriptionRef.get(value), (now) => ({ value: now })),
+      changes: changesOf(value)
     }
   })
 

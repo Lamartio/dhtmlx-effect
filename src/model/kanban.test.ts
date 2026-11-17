@@ -20,17 +20,17 @@ it.effect("moves a card to another column and lane", () =>
   Effect.gen(function* () {
     const model = yield* kanbanModel({ rows: ISSUES, field: "status", columns: COLUMNS, lanes: LANES })
     yield* model.move("a", "done", "app")
-    expect((yield* model.snapshot).cards["a"]).toEqual({ column: "done", lane: "app" })
+    expect((yield* model.snapshot).rows.find((row) => row.id === "a")).toEqual({ id: "a", status: "done", team: "app" })
   }).pipe(Effect.scoped))
 
 it.effect("refuses a move into a full column with strictLimit, and allows one past a soft limit", () =>
   Effect.gen(function* () {
     const model = yield* kanbanModel({ rows: ISSUES, field: "status", columns: COLUMNS })
     yield* model.move("a", "doing")
-    expect((yield* model.snapshot).cards["a"]).toEqual({ column: "todo" })
+    expect((yield* model.snapshot).rows.find((row) => row.id === "a")?.status).toBe("todo")
     yield* model.move("a", "done")
     yield* model.move("b", "done")
-    expect((yield* model.snapshot).cards["b"]).toEqual({ column: "done" })
+    expect((yield* model.snapshot).rows.find((row) => row.id === "b")?.status).toBe("done")
   }).pipe(Effect.scoped))
 
 it.effect("refuses a move of a row, to a column or to a lane that is not there", () =>

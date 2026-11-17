@@ -1,6 +1,6 @@
 import { Effect, PubSub, type Scope, Stream, SubscriptionRef } from "effect"
 import { day } from "./gantt"
-import { type Entry, history, type Input, input, recordInput } from "./model"
+import { changesOf, type Entry, history, type Input, input, recordInput } from "./model"
 
 /** One event. `start` and `end` are instants (ISO 8601 with a zone); the Scheduler shows them in `Browser.timeZone`. */
 export type CalendarEvent = {
@@ -32,6 +32,8 @@ export type SchedulerModel = {
   readonly open: (id: string) => Effect.Effect<void>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<SchedulerState>
+  /** One `void` on each change of the state: see `changesOf`. */
+  readonly changes: Stream.Stream<void>
 }
 
 /** The actions of a `SchedulerModel`, by name. */
@@ -90,6 +92,7 @@ export const schedulerModel = (options: SchedulerModelOptions): Effect.Effect<Sc
           yield* log.record({ _tag: "event", name: "opened", value: id })
         }),
       recent: log.recent,
-      snapshot: Effect.all({ view: SubscriptionRef.get(view), date: SubscriptionRef.get(date), events: SubscriptionRef.get(events) })
+      snapshot: Effect.all({ view: SubscriptionRef.get(view), date: SubscriptionRef.get(date), events: SubscriptionRef.get(events) }),
+      changes: changesOf(view, date, events)
     }
   })
