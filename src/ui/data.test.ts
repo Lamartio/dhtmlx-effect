@@ -129,7 +129,7 @@ it.live("opens and closes folders of a Tree both ways, and keeps them open when 
       { id: "076", title: "Data", value: "Data", status: "todo", parent: "m2" }
     ])
     const data = yield* treeCollection(rows)
-    const { tree: view, expanded, selected } = yield* tree({ data })
+    const { tree: view, expanded, selected, model } = yield* tree({ data, history: 20 })
     yield* settle
     expect(host.textContent).toContain("M2")
     expect(host.textContent).not.toContain("Frames")
@@ -142,6 +142,8 @@ it.live("opens and closes folders of a Tree both ways, and keeps them open when 
     view.collapse("m2")
     yield* settle
     expect(yield* SubscriptionRef.get(expanded)).toEqual([])
+    // A close in the Tree is the action of the model; the open from the ref was not sent back.
+    expect((yield* model.recent).filter((entry) => entry._tag === "action")).toEqual([{ _tag: "action", name: "collapse", value: "m2" }])
     yield* SubscriptionRef.set(selected, "m2")
     yield* settle
     expect(view.selection.getId()).toBe("m2")

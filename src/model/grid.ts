@@ -1,5 +1,7 @@
 import { Effect, PubSub, type Scope, Stream, SubscriptionRef } from "effect"
+import type { Row } from "../core/rows"
 import { type Entry, history, type Input, input, recordInput } from "./model"
+import { selectOn } from "./selection"
 
 export type GridColumn = {
   readonly id: string
@@ -86,12 +88,7 @@ export const gridModel = <R extends { readonly id: string }>(options: GridModelO
       sort,
       filters,
       edits: Stream.fromPubSub(edits),
-      select: (id) =>
-        Effect.gen(function* () {
-          if (id !== undefined && !(yield* has(id))) return
-          yield* action("select", id)
-          if ((yield* SubscriptionRef.get(selected)) !== id) yield* SubscriptionRef.set(selected, id)
-        }),
+      select: selectOn(log, rows as SubscriptionRef.SubscriptionRef<ReadonlyArray<Row>> | undefined, selected),
       sortBy: (id, dir) =>
         Effect.gen(function* () {
           const col = column(id)

@@ -2,3 +2,4 @@
 export * from "./model/model"
 export * from "./model/inputs"
 export * from "./model/grid"
+export * from "./model/selection"

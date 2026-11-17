@@ -2,6 +2,8 @@ import { DataCollection, DataView, Grid, List, setTheme, Tree, TreeCollection } 
 import { Effect, Option, Scope, Stream, SubscriptionRef } from "effect"
 import { diffRows, type Row, type RowOp } from "../core/rows"
 import { type GridEdit, type GridModel, gridModel, type GridModelOptions } from "../model/grid"
+import type { Input } from "../model/model"
+import { type SelectionModel, selectionModel, type SelectionOptions, type TreeModel, treeModel } from "../model/selection"
 import { Browser, follow } from "./browser"
 import { reportedCallback, reporting } from "./problems"
 import { Host, resource } from "./host"
@@ -78,16 +80,16 @@ type Selection = {
 }
 
 /**
- * The selected row as a `SubscriptionRef`, both ways: a click sets it, and a new value selects the
- * row in the widget. `undefined` is no row.
+ * The selected row of a model, both ways: a click is the action `select`, and a new value of
+ * `selected` selects the row in the widget. `undefined` is no row.
  */
-const selectedRef = (selection: Selection, selected: SubscriptionRef.SubscriptionRef<string | undefined>) =>
+const selectedRef = (selection: Selection, model: Pick<SelectionModel, "selected" | "select">) =>
   Effect.gen(function* () {
-    // A select that came from the ref is not sent back: a set inside the set of the ref would wait
+    // A select that came from the model is not sent back: a set inside the set of the ref would wait
     // for its lock, and `runSync` cannot wait.
     let applying = false
     const set = (id: string | undefined) => {
-      if (!applying && Effect.runSync(SubscriptionRef.get(selected)) !== id) Effect.runSync(SubscriptionRef.set(selected, id))
+      if (!applying) Effect.runSync(model.select(id))
     }
     yield* resource(
       "listener",
@@ -100,7 +102,7 @@ const selectedRef = (selection: Selection, selected: SubscriptionRef.Subscriptio
         selection.events.detach("afterUnSelect" as never)
       }
     )
-    yield* follow(selected, (id) => {
+    yield* follow(model.selected, (id) => {
       const current = selection.getId()
       if (id === current) return
       applying = true
@@ -119,10 +121,8 @@ const theme = Effect.gen(function* () {
   yield* follow(browser.dark, (dark) => setTheme(dark ? "dark" : "light", host))
 })
 
-type Selected = { readonly selected?: SubscriptionRef.SubscriptionRef<string | undefined> }
-
-const selectedOr = (options: Selected) =>
-  options.selected === undefined ? SubscriptionRef.make<string | undefined>(undefined) : Effect.succeed(options.selected)
+/** The options of the model of a List, a DataView or a Tree. The renderer has the rows in its collection. */
+type Selected = Omit<SelectionOptions, "rows">
 
 export type { GridColumn, GridEdit, GridSort } from "../model/grid"
 
@@ -243,25 +243,21 @@ export const grid = (options: { readonly data: DataCollection } & Omit<GridModel
  */
 export const tree = (options: {
   readonly data: TreeCollection
-  readonly expanded?: SubscriptionRef.SubscriptionRef<ReadonlyArray<string>>
+  readonly expanded?: Input<ReadonlyArray<string>>
   /** An item as HTML, in place of its `value`. Escape the text with `escapeHtml`. */
   readonly template?: (item: Record<string, unknown>, isFolder: boolean) => string
 } & Selected) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const selected = yield* selectedOr(options)
-    const expanded = options.expanded ?? (yield* SubscriptionRef.make<ReadonlyArray<string>>([]))
+    const model = yield* treeModel(options)
     const view = yield* resourceAfterPaint("tree", () => new Tree(host, { data: options.data as never, css: "dhxe-tree", ...(options.template === undefined ? {} : { template: options.template as never }) }), (view) => view.destructor())
     yield* theme
-    yield* selectedRef(view.selection as unknown as Selection, selected)
+    yield* selectedRef(view.selection as unknown as Selection, model)
     // A change from `expanded` opens folders, and DHTMLX tells of each one: that event must not go
-    // back into `expanded`, or the two follow each other for ever.
+    // back into the model, or the two follow each other for ever.
     let applying = false
     const open = (id: string, on: boolean) => {
-      if (applying) return
-      const ids = Effect.runSync(SubscriptionRef.get(expanded))
-      if (ids.includes(id) === on) return
-      Effect.runSync(SubscriptionRef.set(expanded, on ? [...ids, id] : ids.filter((one) => one !== id)))
+      if (!applying) Effect.runSync(on ? model.expand(id) : model.collapse(id))
     }
     yield* resource(
       "listener",
@@ -274,7 +270,7 @@ export const tree = (options: {
         view.events.detach("afterCollapse" as never)
       }
     )
-    yield* follow(expanded, (ids) => {
+    yield* follow(model.expanded, (ids) => {
       const wanted = new Set(ids)
       const changes: Array<[string, boolean]> = []
       options.data.forEach((item: { id: string | number }) => {
@@ -293,11 +289,12 @@ export const tree = (options: {
         applying = false
       }
     })
-    return { tree: view, selected, expanded }
+    return { tree: view, selected: model.selected, expanded: model.expanded, model }
   }) as Effect.Effect<{
     readonly tree: Tree
     readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>
     readonly expanded: SubscriptionRef.SubscriptionRef<ReadonlyArray<string>>
+    readonly model: TreeModel
   }, never, Host | Browser | Scope.Scope>
 
 /** A row or a tile as HTML. Escape the text of a row with `escapeHtml`: the result goes in as HTML. */
@@ -310,7 +307,7 @@ export const escapeHtml = (text: unknown) =>
 export const list = (options: { readonly data: DataCollection; readonly template: Template; readonly itemHeight?: number } & Selected) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const selected = yield* selectedOr(options)
+    const model = yield* selectionModel(options)
     const view = yield* resourceAfterPaint(
       "list",
       () =>
@@ -326,9 +323,9 @@ export const list = (options: { readonly data: DataCollection; readonly template
       (view) => view.destructor()
     )
     yield* theme
-    yield* selectedRef(view.selection as unknown as Selection, selected)
-    return { list: view, selected }
-  }) as Effect.Effect<{ readonly list: List; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined> }, never, Host | Browser | Scope.Scope>
+    yield* selectedRef(view.selection as unknown as Selection, model)
+    return { list: view, selected: model.selected, model }
+  }) as Effect.Effect<{ readonly list: List; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>; readonly model: SelectionModel }, never, Host | Browser | Scope.Scope>
 
 /**
  * A DHTMLX DataView on a collection: one tile for each item, in rows of tiles, and the selected tile
@@ -338,7 +335,7 @@ export const dataView = (options: { readonly data: DataCollection; readonly temp
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const selected = yield* selectedOr(options)
+    const model = yield* selectionModel(options)
     const wide = options.itemsInRow ?? 4
     const view = yield* resourceAfterPaint(
       "dataview",
@@ -355,7 +352,7 @@ export const dataView = (options: { readonly data: DataCollection; readonly temp
       (view) => view.destructor()
     )
     yield* theme
-    yield* selectedRef(view.selection as unknown as Selection, selected)
+    yield* selectedRef(view.selection as unknown as Selection, model)
     yield* follow(browser.viewport, (viewport) => {
       const inRow = viewport.width < 480 ? 1 : viewport.width < 720 ? Math.min(2, wide) : wide
       if (view.config.itemsInRow !== inRow) {
@@ -363,5 +360,5 @@ export const dataView = (options: { readonly data: DataCollection; readonly temp
         view.paint()
       }
     })
-    return { dataView: view, selected }
-  }) as Effect.Effect<{ readonly dataView: DataView; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined> }, never, Host | Browser | Scope.Scope>
+    return { dataView: view, selected: model.selected, model }
+  }) as Effect.Effect<{ readonly dataView: DataView; readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>; readonly model: SelectionModel }, never, Host | Browser | Scope.Scope>
