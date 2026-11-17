@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Booking, Button, Chart, Column, Combobox, DatePicker, Diagram, Form, Grid, Kanban, Layout, Pivot, RichText, Sidebar, Slider, Spreadsheet, Tabbar, Todo, Toolbar } from "../src/plugin"
+import { Booking, Button, Chart, Column, Combobox, DatePicker, Diagram, FilePicker, Form, Grid, Kanban, Layout, Pivot, RichText, Sidebar, Slider, Spreadsheet, Tabbar, Todo, Toolbar, VaultNode } from "../src/plugin"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },
@@ -112,6 +112,14 @@ export default Layout.make({
                 },
                 { label: "Sheet", child: Spreadsheet.make({ id: "sheet", data: [{ cell: "A1", value: "Apples" }, { cell: "B1", value: 3 }, { cell: "B2", value: "=B1*2" }] }) }
               ]
+            })
+          },
+          {
+            label: "Files",
+            icon: "dxi dxi-file-outline",
+            child: Column.make({
+              id: "files-column",
+              children: [FilePicker.make({ id: "picker", size: 56, label: "Pick a file", maxSize: 1024 * 1024 }), VaultNode.make({ id: "box", maxSize: 1024 * 1024 })]
             })
           },
           {

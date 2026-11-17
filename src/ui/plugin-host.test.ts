@@ -10,14 +10,16 @@ import "@dhtmlx/todolist/dist/todo.css"
 import "@dhtmlx/booking/dist/booking.css"
 import "@dhtmlx/pivot/dist/pivot.css"
 import "@dhtmlx/spreadsheet/codebase/spreadsheet.min.css"
+import "@dhtmlx/vault/codebase/vault.min.css"
 import "../styles.css"
 import { gridModel } from "../model/grid"
 import { sliderModel } from "../model/inputs"
 import { kanbanModel } from "../model/kanban"
-import { connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
+import type { PickedFile, VaultEntry } from "../model/files"
+import { type ActionMessage, connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
 import { column, gridNode, kanbanNode, publishTree, sliderNode, type UiNode } from "../model/tree"
 import { UiState, uiState } from "../model/ui-state"
-import { bindTree, Booking, Button, Chart, Column, Diagram, Form, Pivot, RichText, Spreadsheet, Todo, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
+import { bindTree, Booking, Button, Chart, Column, Diagram, FilePicker, Form, Pivot, VaultNode, RichText, Spreadsheet, Todo, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
 import { Browser, browserWith } from "./browser"
 import { alive, Host } from "./host"
 import { renderPlugin } from "./plugin-host"
@@ -399,6 +401,58 @@ it.live("draws a booking, a pivot and a spreadsheet of a plugin, and a change in
       expect(yield* ui.run("sheet", "edit", [[{ cell: "A1", value: "Plums" }]])).toBe(true)
       yield* settle
       expect(element.textContent).toContain("Plums")
+    }))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+  }))
+
+/** Gives `files` to an `<input type="file">`, as the file dialog does. */
+const choose = (field: HTMLInputElement, files: ReadonlyArray<File>) => {
+  const transfer = new DataTransfer()
+  for (const file of files) transfer.items.add(file)
+  field.files = transfer.files
+  field.dispatchEvent(new Event("change", { bubbles: true }))
+}
+
+it.live("sends a file of a vault and of a file picker to the plugin with its bytes, and refuses one that is too large", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.width = "800px"
+    element.style.height = "600px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const sent: Array<ActionMessage> = []
+      const tapped = { ...pluginEnd, messages: pluginEnd.messages.pipe(Stream.tap((message) => Effect.sync(() => message._tag === "action" && sent.push(message)))) }
+      const ui = yield* uiState
+      yield* bindTree(Column.make({
+        id: "main",
+        children: [FilePicker.make({ id: "picker", size: 60, label: "Pick", maxSize: 10 }), VaultNode.make({ id: "box", maxSize: 10 })]
+      })).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, tapped)
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      yield* settle
+      choose(element.querySelector<HTMLInputElement>("input[type=file]")!, [new File(["hello"], "hello.txt", { type: "text/plain" })])
+      // The Vault takes a drop of files. The entries of a made DataTransfer are empty, so the drop gives the files only.
+      const drop = new DataTransfer()
+      for (const file of [new File(["notes"], "notes.md"), new File(["much too long"], "big.txt")]) drop.items.add(file)
+      const area = element.querySelector(".dhx_vault")!
+      for (const type of ["dragenter", "drop"]) {
+        const event = new Event(type, { bubbles: true, cancelable: true })
+        Object.defineProperty(event, "dataTransfer", { value: { types: ["Files"], files: drop.files } })
+        area.dispatchEvent(event)
+      }
+      yield* Effect.sleep("300 millis")
+      yield* settle
+      const pick = sent.find((message) => message.action === "pick")?.args[0] as PickedFile
+      expect(pick.name).toBe("hello.txt")
+      expect(new TextDecoder().decode(pick.bytes)).toBe("hello")
+      const state = (yield* ui.full).state as { readonly box: { readonly files: ReadonlyArray<VaultEntry> } }
+      expect(state.box.files.map((file) => file.name)).toEqual(["notes.md"])
+      // The large file is refused, and goes out of the Vault.
+      expect(element.textContent).toContain("notes.md")
+      expect(element.textContent).not.toContain("big.txt")
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))

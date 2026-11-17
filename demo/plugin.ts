@@ -10,7 +10,8 @@ const HOST = String(new URLSearchParams(location.search).get("host") ?? "http://
 
 const decode = Schema.decodeUnknownSync(UiSchema)
 
-const log = (line: unknown) => void fetch("/log", { method: "POST", body: JSON.stringify(line) })
+// The bytes of a file show as their length.
+const log = (line: unknown) => void fetch("/log", { method: "POST", body: JSON.stringify(line, (_key, value) => (value instanceof ArrayBuffer ? `<${value.byteLength} bytes>` : value)) })
 
 const program = Effect.gen(function* () {
   const ui = yield* UiState

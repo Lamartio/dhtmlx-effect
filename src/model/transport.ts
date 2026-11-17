@@ -48,8 +48,14 @@ export const portChannel = <In, Out>(port: MessagePort, schema: Schema.Schema<In
         port.close()
       })
     )
-    return { messages: Stream.fromQueue(inbox), send: (message: Out) => Effect.sync(() => port.postMessage(message)) }
+    return { messages: Stream.fromQueue(inbox), send: (message: Out) => Effect.sync(() => port.postMessage(message, transferables(message))) }
   })
+
+/** The bytes of the files in the args of an action: they move to the other side, and are not copied. */
+const transferables = (message: unknown): Array<Transferable> => {
+  const args = (message as { readonly _tag?: string; readonly args?: ReadonlyArray<unknown> })._tag === "action" ? ((message as { readonly args: ReadonlyArray<unknown> }).args) : []
+  return args.flatMap((arg) => (typeof arg === "object" && arg !== null && (arg as { readonly bytes?: unknown }).bytes instanceof ArrayBuffer ? [(arg as { readonly bytes: ArrayBuffer }).bytes] : []))
+}
 
 /** The first message, with the port: from the page to the plugin. */
 const CONNECT = "dhtmlx-effect/connect"

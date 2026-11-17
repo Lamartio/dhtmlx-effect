@@ -106,6 +106,17 @@ export const WireNodes = {
     readonly: Schema.optional(Schema.Boolean),
     multiSheets: Schema.optional(Schema.Boolean)
   }),
+  /** A Vault: the user adds files and sees them; the files are the state of its model, and the bytes go to the plugin. */
+  vault: Schema.TaggedStruct("vault", { id: Schema.String, size: Size, mode: Schema.optional(Schema.Literals(["list", "grid"])), toolbar: Schema.optional(Schema.Boolean), maxSize: Schema.optional(Schema.Number) }),
+  /** A button that opens the file dialog; each file goes to the plugin with its bytes. */
+  filepicker: Schema.TaggedStruct("filepicker", {
+    id: Schema.String,
+    size: Size,
+    label: Schema.optional(Schema.String),
+    accept: Schema.optional(Schema.String),
+    multiple: Schema.optional(Schema.Boolean),
+    maxSize: Schema.optional(Schema.Number)
+  }),
   menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, items: Schema.Array(MenuItemSchema) }),
   ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */

@@ -5,6 +5,7 @@ import { TodoDataSchema } from "./todo"
 import { BookingCardSchema } from "./booking"
 import { PivotConfigSchema } from "./pivot"
 import { SpreadsheetDataSchema } from "./spreadsheet"
+import { VaultEntrySchema } from "./files"
 
 /**
  * The state of each kind of node, as it is in the document: the Schema that the page checks after
@@ -56,6 +57,8 @@ export const STATES = {
   booking: Schema.Struct({ cards: Schema.Array(BookingCardSchema) }),
   pivot: Schema.Struct({ rows: Rows, config: PivotConfigSchema }),
   spreadsheet: Schema.Struct({ data: SpreadsheetDataSchema }),
+  vault: Schema.Struct({ files: Schema.Array(VaultEntrySchema) }),
+  filepicker: none,
   toolbar: none,
   button: none,
   menu: none,

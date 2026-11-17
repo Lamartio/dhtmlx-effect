@@ -4,6 +4,7 @@ import { STATES } from "./states"
 import type { Row } from "../core/rows"
 import { CHART_ACTIONS, type ChartModel } from "./chart"
 import { CLICK_ACTIONS, type ClickModel } from "./clicks"
+import { FILE_PICKER_ACTIONS, type FilePickerModel, VAULT_ACTIONS, type VaultEntry, type VaultModel } from "./files"
 import { BOOKING_ACTIONS, type BookingCard, type BookingModel } from "./booking"
 import { PIVOT_ACTIONS, type PivotConfig, type PivotModel } from "./pivot"
 import { SPREADSHEET_ACTIONS, type SpreadsheetData, type SpreadsheetModel } from "./spreadsheet"
@@ -252,3 +253,11 @@ export const remotePivot = (host: Host, id: string) =>
 /** The remote model of a Spreadsheet: its cells. */
 export const remoteSpreadsheet = (host: Host, id: string) =>
   Effect.map(remoteModel(host, id, { data: [] as SpreadsheetData }, SPREADSHEET_ACTIONS, STATES.spreadsheet), (model) => model as unknown as SpreadsheetModel)
+
+/** The remote model of a Vault: its files; `added` stays in the plugin. */
+export const remoteVault = (host: Host, id: string) =>
+  Effect.map(remoteModel(host, id, { files: [] as ReadonlyArray<VaultEntry> }, VAULT_ACTIONS, STATES.vault), (model) => ({ ...model, added: Stream.empty }) as unknown as VaultModel)
+
+/** The remote model of a file picker; `picked` stays in the plugin. */
+export const remoteFilePicker = (host: Host, id: string) =>
+  Effect.map(remoteModel(host, id, {}, FILE_PICKER_ACTIONS, STATES.filepicker), (model) => ({ ...model, picked: Stream.empty }) as unknown as FilePickerModel)

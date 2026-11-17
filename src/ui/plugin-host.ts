@@ -2,7 +2,7 @@ import { Effect, Match, Option, Schema, type Scope, Stream, SubscriptionRef } fr
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteBooking, remotePivot, remoteSpreadsheet, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTodo, remoteTree, remoteValue } from "../model/remote"
+import { type Host as PluginHost, remoteFilePicker, remoteVault, remoteBooking, remotePivot, remoteSpreadsheet, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTodo, remoteTree, remoteValue } from "../model/remote"
 import { STATES } from "../model/states"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
@@ -19,6 +19,9 @@ import { datepicker } from "./datepicker"
 import { diagram, diagramEditor } from "./diagram"
 import { richtext } from "./richtext"
 import { booking } from "./booking"
+import { filePicker } from "./filepicker"
+import { vault } from "./vault"
+import { MAX_FILE_BYTES } from "../model/files"
 import { pivot } from "./pivot"
 import { spreadsheet } from "./spreadsheet"
 import { todo } from "./todo"
@@ -134,6 +137,65 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
           const model = yield* remoteSpreadsheet(page, node.id)
           const { _tag, id: _id, size: _size, ...options } = node
           return yield* spreadsheet({ ...(options as object), data: yield* bridge(model.data, model.edit) })
+        }),
+      vault: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteVault(page, node.id)
+          const max = node.maxSize ?? MAX_FILE_BYTES
+          const made = yield* vault({ ...(node.mode === undefined ? {} : { mode: node.mode }), ...(node.toolbar === undefined ? {} : { toolbar: node.toolbar }) })
+          // The files that the page sends now: the state of the plugin does not take them out yet.
+          // ponytail: a change of the state between a send and its answer can take out a file in flight; track the answers if that shows.
+          const sending = new Set<string>()
+          let shown = new Set<string>()
+          yield* SubscriptionRef.changes(made.files).pipe(
+            Stream.runForEach((files) =>
+              Effect.gen(function* () {
+                const now = new Set(files.map((file) => file.id))
+                const known = new Set((yield* SubscriptionRef.get(model.files)).map((file) => file.id))
+                for (const file of files) {
+                  if (shown.has(file.id) || known.has(file.id) || file.file === undefined) continue
+                  sending.add(file.id)
+                  yield* Effect.forkScoped(Effect.gen(function* () {
+                    const bytes = file.size <= max ? yield* Effect.promise(() => file.file!.arrayBuffer()) : new ArrayBuffer(0)
+                    sending.delete(file.id)
+                    yield* model.add({ id: file.id, name: file.name, size: file.size, type: file.file!.type, bytes })
+                  }))
+                }
+                for (const id of shown) if (!now.has(id) && known.has(id)) yield* model.remove(id)
+                shown = now
+              })),
+            reporting(`The vault ${node.id}`),
+            Effect.forkScoped
+          )
+          yield* SubscriptionRef.changes(model.files).pipe(
+            Stream.runForEach((files) =>
+              Effect.sync(() => {
+                const ids = new Set(files.map((file) => file.id))
+                const data = made.vault.data as unknown as { readonly serialize: () => ReadonlyArray<{ readonly id: string }>; readonly remove: (id: string) => void; readonly update: (id: string, fields: object) => void; readonly add: (item: object) => void; readonly exists: (id: string) => boolean }
+                for (const item of data.serialize()) if (!ids.has(item.id) && !sending.has(item.id)) data.remove(item.id)
+                for (const file of files) {
+                  if (!data.exists(file.id)) data.add({ ...file })
+                  else data.update(file.id, { status: file.status, progress: file.progress })
+                }
+              })),
+            reporting(`The vault ${node.id}`),
+            Effect.forkScoped
+          )
+          return made
+        }),
+      filepicker: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteFilePicker(page, node.id)
+          const max = node.maxSize ?? MAX_FILE_BYTES
+          const made = yield* filePicker(Object.fromEntries(Object.entries({ label: node.label, accept: node.accept, multiple: node.multiple }).filter(([, value]) => value !== undefined)))
+          yield* made.picked.pipe(
+            Stream.runForEach((file) =>
+              Effect.flatMap(file.size <= max ? Effect.promise(() => file.arrayBuffer()) : Effect.succeed(new ArrayBuffer(0)), (bytes) =>
+                model.pick({ id: crypto.randomUUID(), name: file.name, size: file.size, type: file.type, bytes }))),
+            reporting(`The file picker ${node.id}`),
+            Effect.forkScoped
+          )
+          return made
         }),
       chart: (node) =>
         Effect.gen(function* () {
