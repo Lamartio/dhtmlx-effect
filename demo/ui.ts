@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Button, Chart, Column, Combobox, DatePicker, Form, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/plugin"
+import { Button, Chart, Column, Combobox, DatePicker, Diagram, Form, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/plugin"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },
@@ -65,6 +65,21 @@ export default Layout.make({
                 { id: "sep", month: "Sep", done: 4, open: 9 },
                 { id: "oct", month: "Oct", done: 8, open: 6 },
                 { id: "nov", month: "Nov", done: 12, open: 3 }
+              ]
+            })
+          },
+          {
+            label: "Flow",
+            icon: "dxi dxi-tune",
+            child: Diagram.make({
+              id: "flow",
+              editor: true,
+              items: [
+                { id: "plan", type: "rectangle", text: "Plan", x: 40, y: 40 },
+                { id: "build", type: "rectangle", text: "Build", x: 300, y: 40 },
+                { id: "ship", type: "rectangle", text: "Ship", x: 560, y: 40 },
+                { id: "a", type: "line", from: "plan", to: "build" },
+                { id: "b", type: "line", from: "build", to: "ship" }
               ]
             })
           },

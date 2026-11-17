@@ -5,7 +5,7 @@
 export * from "./protocol"
 export { renderPlugin } from "./ui/plugin-host"
 export {
-  connectHost, type Host as Page, memoryChannel, remoteChart, remoteClicks, remoteForm, remoteGantt, remoteGrid, remoteKanban, remoteModel, remoteScheduler,
+  connectHost, type Host as Page, memoryChannel, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteGrid, remoteKanban, remoteModel, remoteScheduler,
   remoteSelection, remoteTree, remoteValue
 } from "./model/remote"
 export { openPlugin, portChannel } from "./model/transport"

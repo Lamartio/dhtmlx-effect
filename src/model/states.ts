@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { DiagramItemSchema } from "./diagram"
 import { ZOOM_LEVELS } from "./gantt"
 
 /**
@@ -45,6 +46,7 @@ export const STATES = {
   kanban: Schema.Struct({ selected, rows: Rows }),
   form: Schema.Struct({ values: Schema.Record(Schema.String, Schema.Unknown), errors: Schema.Record(Schema.String, Schema.String) }),
   chart: Schema.Struct({ rows: Rows, hidden: strings }),
+  diagram: Schema.Struct({ items: Schema.Array(DiagramItemSchema), selected }),
   toolbar: none,
   button: none,
   menu: none,

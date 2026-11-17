@@ -2,7 +2,7 @@ import { Effect, Match, Option, Schema, type Scope, Stream, SubscriptionRef } fr
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteChart, remoteClicks, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
+import { type Host as PluginHost, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
 import { STATES } from "../model/states"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
@@ -16,6 +16,7 @@ import { renderScheduler } from "./scheduler"
 import { button } from "./button"
 import { chart } from "./chart"
 import { datepicker } from "./datepicker"
+import { diagram, diagramEditor } from "./diagram"
 import { renderForm } from "./form"
 import { layout } from "./layout"
 import { gridContextMenu, menu, ribbon } from "./menus"
@@ -83,6 +84,22 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
             ...(node.label === undefined ? {} : { label: node.label }),
             ...(node.placeholder === undefined ? {} : { placeholder: node.placeholder })
           })
+        }),
+      diagram: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteDiagram(page, node.id)
+          if (node.editor === true) {
+            // The editor gives all the items after each change: that is the action `edit`.
+            return yield* diagramEditor({ data: (yield* bridge(model.items, model.edit)) as never, ...(node.type === undefined ? {} : { type: node.type }) })
+          }
+          const made = yield* diagram({
+            data: model.items as never,
+            selected: yield* bridge(model.selected, model.select),
+            ...(node.type === undefined ? {} : { type: node.type }),
+            ...(node.config === undefined ? {} : { config: node.config as never })
+          })
+          yield* made.clicks.pipe(Stream.runForEach((id) => model.click(id)), reporting(`The diagram ${node.id}`), Effect.forkScoped)
+          return made
         }),
       chart: (node) =>
         Effect.gen(function* () {
@@ -239,18 +256,24 @@ const childRefs = (node: UiNode, children: SubscriptionRef.SubscriptionRef<Reado
  * `set`; the value of the plugin comes back into `active`, also after a refusal.
  */
 const chosen = <A>(page: PluginHost, id: string, first: A) =>
+  Effect.flatMap(remoteValue<A>(page, id, first, STATES.tabbar), (model) => bridge(model.value, model.set))
+
+/**
+ * A local ref for a widget that sets its own ref, joined to a ref of a remote model: a change of the
+ * widget is the action `act`, and the value of the plugin comes back into the local ref.
+ */
+const bridge = <A>(remote: SubscriptionRef.SubscriptionRef<A>, act: (value: A) => Effect.Effect<boolean>) =>
   Effect.gen(function* () {
-    const model = yield* remoteValue<A>(page, id, first, STATES.tabbar)
-    const active = yield* SubscriptionRef.make(yield* SubscriptionRef.get(model.value))
-    yield* SubscriptionRef.changes(model.value).pipe(
-      Stream.runForEach((value) => Effect.flatMap(SubscriptionRef.get(active), (now) => (now === value ? Effect.void : SubscriptionRef.set(active, value)))),
+    const local = yield* SubscriptionRef.make(yield* SubscriptionRef.get(remote))
+    yield* SubscriptionRef.changes(remote).pipe(
+      Stream.runForEach((value) => Effect.flatMap(SubscriptionRef.get(local), (now) => (stableJson(now) === stableJson(value) ? Effect.void : SubscriptionRef.set(local, value)))),
       Effect.forkScoped
     )
-    yield* SubscriptionRef.changes(active).pipe(
-      Stream.runForEach((value) => Effect.flatMap(SubscriptionRef.get(model.value), (now) => (now === value ? Effect.void : model.set(value)))),
+    yield* SubscriptionRef.changes(local).pipe(
+      Stream.runForEach((value) => Effect.flatMap(SubscriptionRef.get(remote), (now) => (stableJson(now) === stableJson(value) ? Effect.void : act(value)))),
       Effect.forkScoped
     )
-    return active
+    return local
   })
 
 /** A part that fills its host as a flex column with no scroll, as the root does: for the pane of a tab. */
@@ -331,13 +354,15 @@ const nodePart = (page: PluginHost, item: SubscriptionRef.SubscriptionRef<UiNode
           const size = node.size
           element.style.flex = size === undefined ? "1 1 0" : `0 0 ${size}px`
           element.style[frame === "column" ? "minHeight" : "minWidth"] = "0"
-          element.style.position = "relative"
-          element.style.display = "flex"
-          element.style.flexDirection = "column"
           yield* SubscriptionRef.set(children, childrenOf(node))
           const next = shapeOf(node)
           if (next === shape) return
           shape = next
+          // The base of each new widget: a widget can change these (a sidebar sets a row), so they
+          // are set again only when the widget is made again, not on each change of the node.
+          element.style.position = "relative"
+          element.style.display = "flex"
+          element.style.flexDirection = "column"
           yield* show(widgetOf(page, node, children).pipe(Effect.provideService(Host, element)))
         })),
       reporting(`The node ${Effect.runSync(SubscriptionRef.get(item)).id} of the plugin`),

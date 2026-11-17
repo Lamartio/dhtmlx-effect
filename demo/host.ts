@@ -1,6 +1,7 @@
 /** The page: the plugin of the sender in a frame, and the UI that it sends, drawn with DHTMLX. */
 import "dhx-suite/codebase/suite.min.css"
 import "@dhtmlx/kanban/dist/kanban.css"
+import "@dhtmlx/diagram/codebase/diagram.min.css"
 import "../src/styles.css"
 import { Effect } from "effect"
 import { connectHost, layerBrowserLive, mount, openPlugin, renderPlugin } from "../src/host"

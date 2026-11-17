@@ -2,6 +2,7 @@ import { Effect, Exit, Match, Schema, Scope, Stream, SubscriptionRef } from "eff
 import type { Row as DataRow } from "../core/rows"
 import { chartModel, seriesIds } from "./chart"
 import { clickable, clickModel } from "./clicks"
+import { diagramModel, DiagramItemSchema } from "./diagram"
 import { formModel, rulesCheck } from "./form"
 import { ganttModel } from "./gantt"
 import { gridModel } from "./grid"
@@ -13,7 +14,7 @@ import { selectionModel, treeModel } from "./selection"
 import { EventSchema, Rows, TaskSchema } from "./states"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
-  cellsModel, chartNode, clicksNode, datepickerNode, formNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
+  cellsModel, chartNode, clicksNode, datepickerNode, diagramNode, formNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
   WireNodes
 } from "./tree"
 import type { UiState } from "./ui-state"
@@ -43,6 +44,8 @@ export const Kanban = WireNodes.kanban.mapFields((fields) => ({ ...fields, rows:
 export const Form = WireNodes.form.mapFields((fields) => ({ ...fields, values: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)) }))
 /** A Chart: its config, its rows, and the series that start hidden. */
 export const Chart = WireNodes.chart.mapFields((fields) => ({ ...fields, rows: Rows, hidden: Schema.optional(Schema.Array(Schema.String)) }))
+/** A Diagram: its kind and config, and its items as data. */
+export const Diagram = WireNodes.diagram.mapFields((fields) => ({ ...fields, items: Schema.Array(DiagramItemSchema) }))
 export const DatePicker = WireNodes.datepicker.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
 /** A Toolbar, a Button, a Menu and a Ribbon have no data: their items are config, and a click goes to the plugin. */
 export const Toolbar = WireNodes.toolbar
@@ -50,7 +53,7 @@ export const Button = WireNodes.button
 export const Menu = WireNodes.menu
 export const Ribbon = WireNodes.ribbon
 
-const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker, Chart] as const
+const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker, Chart, Diagram] as const
 type Widget = (typeof Widgets)[number]["Type"]
 
 /** A frame of the composed UI, with composed children. */
@@ -163,7 +166,7 @@ export const Tabbar = {
 /** The composed Schema of each kind of widget, by its `_tag`. */
 const COMPOSED = {
   calendar: Calendar, timepicker: Timepicker, slider: Slider, colorpicker: Colorpicker, combobox: Combobox, grid: Grid, list: List, dataview: DataView, tree: Tree,
-  gantt: Gantt, scheduler: Scheduler, kanban: Kanban, toolbar: Toolbar, button: Button, menu: Menu, ribbon: Ribbon, form: Form, datepicker: DatePicker, chart: Chart
+  gantt: Gantt, scheduler: Scheduler, kanban: Kanban, toolbar: Toolbar, button: Button, menu: Menu, ribbon: Ribbon, form: Form, datepicker: DatePicker, chart: Chart, diagram: Diagram
 } as const satisfies { readonly [K in Widget["_tag"]]: { readonly fields: object } }
 
 /** The fields of a kind that are data, not config: the fields of its composed Schema that its wire Schema has not. */
@@ -213,6 +216,7 @@ const modelOf = (node: Widget, data: SubscriptionRef.SubscriptionRef<any>, wire:
         Effect.andThen(formModel(rulesCheck(node.fields), node.fields, { values: data })),
         Effect.flatMap((model) => formNode(wire as never, model))
       ),
+    diagram: () => Effect.flatMap(diagramModel({ items: data }), (model) => diagramNode(wire as never, model)),
     datepicker: () => Effect.flatMap(calendarModel({ value: data }), (model) => datepickerNode(wire as never, model)),
     chart: (node) =>
       Effect.gen(function* () {

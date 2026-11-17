@@ -1,5 +1,6 @@
 import { Effect, Schema, type Scope, Stream, SubscriptionRef } from "effect"
 import { CHART_ACTIONS, ChartConfigSchema, type ChartModel } from "./chart"
+import { DIAGRAM_ACTIONS, type DiagramModel } from "./diagram"
 import { CLICK_ACTIONS, type ClickModel, type MenuItem, MenuItemSchema, ToolbarItemSchema } from "./clicks"
 import { FieldSchema, FORM_ACTIONS, type FormModel } from "./form"
 import { GANTT_ACTIONS, type GanttModel } from "./gantt"
@@ -70,6 +71,14 @@ export const WireNodes = {
   datepicker: Schema.TaggedStruct("datepicker", { id: Schema.String, size: Size, label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
   /** A Chart: its config as data (type, series, scales, legend), and its rows as the state of its model. */
   chart: Schema.TaggedStruct("chart", { id: Schema.String, size: Size, config: ChartConfigSchema }),
+  /** A Diagram (`editor: true` for the editor, where the user draws): its kind and its config as data, its items as the state of its model. */
+  diagram: Schema.TaggedStruct("diagram", {
+    id: Schema.String,
+    size: Size,
+    type: Schema.optional(Schema.Literals(["default", "org", "mindmap"])),
+    editor: Schema.optional(Schema.Boolean),
+    config: Schema.optional(Schema.Record(Schema.String, Schema.Unknown))
+  }),
   menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, items: Schema.Array(MenuItemSchema) }),
   ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */
@@ -309,6 +318,14 @@ export const chartNode = (node: Extract<WidgetNode, { readonly _tag: "chart" }>,
   Effect.gen(function* () {
     const ui = yield* UiState
     yield* ui.register(node.id, partOf(model, CHART_ACTIONS))
+    return node
+  })
+
+/** A Diagram in the page, with its model under the id of the node. */
+export const diagramNode = (node: Extract<WidgetNode, { readonly _tag: "diagram" }>, model: DiagramModel) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(node.id, partOf(model, DIAGRAM_ACTIONS))
     return node
   })
 

@@ -4,6 +4,7 @@ import { STATES } from "./states"
 import type { Row } from "../core/rows"
 import { CHART_ACTIONS, type ChartModel } from "./chart"
 import { CLICK_ACTIONS, type ClickModel } from "./clicks"
+import { DIAGRAM_ACTIONS, type DiagramModel, type Item } from "./diagram"
 import { FORM_ACTIONS, type FormModel } from "./form"
 import { type GanttModel, GANTT_ACTIONS, type Task, type Zoom } from "./gantt"
 import { GRID_ACTIONS, type GridModel, type GridSort } from "./grid"
@@ -223,4 +224,11 @@ export const remoteChart = (host: Host, id: string) =>
   Effect.map(
     remoteModel(host, id, { rows: [] as ReadonlyArray<Row>, hidden: [] as ReadonlyArray<string> }, CHART_ACTIONS, STATES.chart),
     (model) => ({ ...model, clicked: Stream.empty }) as unknown as ChartModel
+  )
+
+/** The remote model of a Diagram: its items and its selected item; `clicked` stays in the plugin. */
+export const remoteDiagram = (host: Host, id: string) =>
+  Effect.map(
+    remoteModel(host, id, { items: [] as ReadonlyArray<Item>, selected: undefined as string | undefined }, DIAGRAM_ACTIONS, STATES.diagram),
+    (model) => ({ ...model, clicked: Stream.empty }) as unknown as DiagramModel
   )
