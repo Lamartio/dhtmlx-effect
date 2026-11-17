@@ -10,6 +10,12 @@ import { partOf, uiState } from "./ui-state"
 /** Messages over a port take a turn of the event loop of Bun, not only of the fibers. */
 const settle = Effect.promise(() => new Promise((done) => setTimeout(done, 20)))
 
+/** Waits, in turns of the event loop, until `check` is true or two seconds are gone: a busy machine is slow. */
+const until = (check: Effect.Effect<boolean>) =>
+  Effect.gen(function* () {
+    for (let i = 0; i < 200 && !(yield* check); i++) yield* settle
+  })
+
 it.live("joins a plugin and a page over a real MessageChannel", () =>
   Effect.gen(function* () {
     const { port1, port2 } = new MessageChannel()
@@ -23,7 +29,7 @@ it.live("joins a plugin and a page over a real MessageChannel", () =>
     yield* settle
     const remote = yield* remoteGrid(host, "grid")
     yield* remote.select("b")
-    yield* settle
+    yield* until(Effect.map(SubscriptionRef.get(remote.selected), (selected) => selected === "b"))
     expect((yield* grid.snapshot).selected).toBe("b")
     expect(yield* SubscriptionRef.get(remote.selected)).toBe("b")
   }).pipe(Effect.scoped))
@@ -40,7 +46,7 @@ it.live("reports and drops a message that does not pass the Schema", () =>
     port2.postMessage({ _tag: "action", n: 1, id: "grid", action: "select", args: ["a"] })
     port2.postMessage({ _tag: "action", n: "two", id: "grid" })
     port2.postMessage("<img src=x onerror=alert(1)>")
-    yield* settle
+    yield* until(Effect.sync(() => reports.length === 2))
     expect(got).toEqual([{ _tag: "action", n: 1, id: "grid", action: "select", args: ["a"] }])
     expect(reports).toEqual(["The channel to the page", "The channel to the page"])
     port2.close()
