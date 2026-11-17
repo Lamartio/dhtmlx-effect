@@ -12,7 +12,7 @@ import { watch } from "node:fs"
 import { join } from "node:path"
 import host from "./host.html"
 import plugin from "./plugin.html"
-import { UiSchema } from "../src/model/nodes"
+import { UiSchema } from "../src/plugin"
 
 const HOST_PORT = Number(process.env["HOST_PORT"] ?? 4100)
 const PLUGIN_PORT = Number(process.env["PLUGIN_PORT"] ?? 4101)

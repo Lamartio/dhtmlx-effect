@@ -43,6 +43,9 @@ The package ships TypeScript source, so use a bundler that reads TypeScript (Vit
 | `dhtmlx-effect/spreadsheet` | `@dhtmlx/spreadsheet` | Spreadsheet |
 | `dhtmlx-effect/vault` | `@dhtmlx/vault` | Vault, the file uploader |
 | `dhtmlx-effect/headless` | `effect` | The models of the widgets, with no DHTMLX: for now Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler and Kanban |
+| `dhtmlx-effect/plugin` | `effect` | The frame of a plugin, with no DHTMLX: the models, the UI composed with Schema, `bindTree`, `servePlugin`, `acceptHost` |
+| `dhtmlx-effect/host` | `dhx-suite` and the products in the tree | The page of a plugin: `renderPlugin`, the remote models, `connectHost`, `openPlugin` |
+| `dhtmlx-effect/protocol` | `effect` | What both share: the Schemas of the nodes, the states and the messages, the patch |
 | `dhtmlx-effect/plugin-host` | `dhx-suite` and the products in the tree | `renderPlugin`: draws the UI that a plugin in another frame sends |
 | `dhtmlx-effect/storybook` | `@storybook/html-vite` | Stories that are Effect trees, with the Browser layer in the toolbar |
 | `dhtmlx-effect/styles.css` | | The few styles of the wrappers. Load it after the CSS of DHTMLX |

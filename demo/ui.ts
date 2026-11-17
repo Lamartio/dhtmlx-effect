@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Button, Chart, Column, Combobox, DatePicker, Form, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/model/nodes"
+import { Button, Chart, Column, Combobox, DatePicker, Form, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/plugin"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },

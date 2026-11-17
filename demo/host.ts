@@ -3,11 +3,7 @@ import "dhx-suite/codebase/suite.min.css"
 import "@dhtmlx/kanban/dist/kanban.css"
 import "../src/styles.css"
 import { Effect } from "effect"
-import { connectHost } from "../src/model/remote"
-import { openPlugin } from "../src/model/transport"
-import { layerBrowserLive } from "../src/ui/browser"
-import { mount } from "../src/ui/host"
-import { renderPlugin } from "../src/ui/plugin-host"
+import { connectHost, layerBrowserLive, mount, openPlugin, renderPlugin } from "../src/host"
 
 const PLUGIN = String(new URLSearchParams(location.search).get("plugin") ?? "http://localhost:4101")
 

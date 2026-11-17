@@ -4,10 +4,7 @@
  * (an EventSource), and gets each action in its log.
  */
 import { Effect, Layer, Queue, Schema, Stream } from "effect"
-import { servePlugin } from "../src/model/remote"
-import { bindTree, type Ui, UiSchema } from "../src/model/nodes"
-import { acceptHost } from "../src/model/transport"
-import { UiState, uiState } from "../src/model/ui-state"
+import { acceptHost, bindTree, servePlugin, type Ui, UiSchema, UiState, uiState } from "../src/plugin"
 
 const HOST = String(new URLSearchParams(location.search).get("host") ?? "http://localhost:4100")
 
