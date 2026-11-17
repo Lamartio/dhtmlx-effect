@@ -164,6 +164,8 @@ export const renderGrid = (model: GridModel, options: { readonly data: DataColle
           selection: "row",
           autoWidth: true,
           keyNavigation: true,
+          // A cell is text: a value from a store, or from a plugin, never goes in as HTML.
+          htmlEnable: false,
           css: "dhxe-grid"
         }),
       (view) => view.destructor()

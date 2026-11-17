@@ -43,6 +43,7 @@ The package ships TypeScript source, so use a bundler that reads TypeScript (Vit
 | `dhtmlx-effect/spreadsheet` | `@dhtmlx/spreadsheet` | Spreadsheet |
 | `dhtmlx-effect/vault` | `@dhtmlx/vault` | Vault, the file uploader |
 | `dhtmlx-effect/headless` | `effect` | The models of the widgets, with no DHTMLX: for now Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler and Kanban |
+| `dhtmlx-effect/plugin-host` | `dhx-suite` and the products in the tree | `renderPlugin`: draws the UI that a plugin in another frame sends |
 | `dhtmlx-effect/storybook` | `@storybook/html-vite` | Stories that are Effect trees, with the Browser layer in the toolbar |
 | `dhtmlx-effect/styles.css` | | The few styles of the wrappers. Load it after the CSS of DHTMLX |
 
@@ -144,6 +145,10 @@ yield* hashOf(yield* model.snapshot)     // a SHA-256, to compare a state before
 An option can be a value, a `SubscriptionRef` that both sides share, or a `Stream` (`input`). Each widget gives its model too: `slider(options)` gives `{ slider, value, model }`.
 
 A renderer takes a model that was made before: `slider(options)` is `sliderModel(options)` then `renderSlider(model, view)`. So the model can live somewhere else, such as in another frame. Each model type lists its actions (`GRID_ACTIONS`, `KANBAN_ACTIONS`, ...), and `dispatch(model, GRID_ACTIONS, "select", ["b"])` runs one by its name.
+
+### A plugin in another frame
+
+The models can live in a plugin, in an iframe, and the widgets in the page around it. The plugin makes the UI as data with `column`, `row` and a node for each widget (`gridNode`, `kanbanNode`, ...), and `servePlugin` sends the state and the tree as JSON patches. The page keeps a copy (`connectHost`) and draws it with `renderPlugin` from `dhtmlx-effect/plugin-host`: a widget on a remote model for each node. An action of the user goes to the plugin with the id of its node; the plugin answers it, and a refused action draws the old value back. Only what changed is drawn again. `openPlugin` and `acceptHost` join the two frames over one `MessagePort`, and each side checks each message with a Schema.
 
 ### A widget never stops in silence
 
