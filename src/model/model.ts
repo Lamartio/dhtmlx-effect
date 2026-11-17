@@ -66,13 +66,14 @@ export const hashOf = (value: unknown) =>
 /**
  * Runs the action `name` of a model with `args`, as a message from another frame asks: one way to
  * reach each action by its name. `actions` is the list of the model type, such as `GRID_ACTIONS`.
- * Gives false for a name that is not in the list, and runs nothing then.
+ * Gives false for a name that is not in the list, and runs nothing then, and false when the action
+ * refuses (a select of a row that is not there): each action gives whether it took the change.
  */
 export const dispatch = <M extends object>(model: M, actions: ReadonlyArray<keyof M & string>, name: string, args: ReadonlyArray<unknown> = []): Effect.Effect<boolean> => {
   if (!(actions as ReadonlyArray<string>).includes(name)) return Effect.succeed(false)
   const action = model[name as keyof M] as unknown
   const run = typeof action === "function" ? (action as (...all: ReadonlyArray<unknown>) => unknown)(...args) : action
-  return Effect.isEffect(run) ? Effect.as(run as Effect.Effect<unknown>, true) : Effect.succeed(false)
+  return Effect.isEffect(run) ? Effect.map(run as Effect.Effect<unknown>, (accepted) => accepted !== false) : Effect.succeed(false)
 }
 
 /** One `void` on each change of any of the refs (and one for each at the start): the signal that a state may have changed. */

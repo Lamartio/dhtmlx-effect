@@ -14,11 +14,12 @@ export const selectOn = (
   rows: SubscriptionRef.SubscriptionRef<ReadonlyArray<Row>> | undefined,
   selected: SubscriptionRef.SubscriptionRef<string | undefined>
 ) =>
-  (id: string | undefined): Effect.Effect<void> =>
+  (id: string | undefined): Effect.Effect<boolean> =>
     Effect.gen(function* () {
-      if (id !== undefined && rows !== undefined && !(yield* SubscriptionRef.get(rows)).some((row) => row.id === id)) return
+      if (id !== undefined && rows !== undefined && !(yield* SubscriptionRef.get(rows)).some((row) => row.id === id)) return false
       yield* log.record({ _tag: "action", name: "select", value: id })
       if ((yield* SubscriptionRef.get(selected)) !== id) yield* SubscriptionRef.set(selected, id)
+      return true
     })
 
 export type SelectionState = {
@@ -30,7 +31,7 @@ export type SelectionState = {
 export type SelectionModel = {
   readonly selected: SubscriptionRef.SubscriptionRef<string | undefined>
   /** Chooses a row, or none. A row that is not in the rows changes nothing. */
-  readonly select: (id: string | undefined) => Effect.Effect<void>
+  readonly select: (id: string | undefined) => Effect.Effect<boolean>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<SelectionState>
   /** One `void` on each change of the state: see `changesOf`. */
@@ -82,8 +83,8 @@ export type TreeModel = Omit<SelectionModel, "snapshot"> & {
   /** The ids of the open folders. */
   readonly expanded: SubscriptionRef.SubscriptionRef<ReadonlyArray<string>>
   /** Opens a folder. A row with no children, or that is not there, changes nothing. */
-  readonly expand: (id: string) => Effect.Effect<void>
-  readonly collapse: (id: string) => Effect.Effect<void>
+  readonly expand: (id: string) => Effect.Effect<boolean>
+  readonly collapse: (id: string) => Effect.Effect<boolean>
   readonly snapshot: Effect.Effect<TreeState>
   /** One `void` on each change of the state: see `changesOf`. */
   readonly changes: Stream.Stream<void>
@@ -102,11 +103,12 @@ export const treeModel = (options: SelectionOptions & { readonly expanded?: Inpu
       rows === undefined ? Effect.succeed(true) : Effect.map(SubscriptionRef.get(rows), (all) => all.some((row) => row.parent === id))
     const open = (name: "expand" | "collapse", id: string) =>
       Effect.gen(function* () {
-        if (name === "expand" && !(yield* isFolder(id))) return
+        if (name === "expand" && !(yield* isFolder(id))) return false
         yield* log.record({ _tag: "action", name, value: id })
         const now = yield* SubscriptionRef.get(expanded)
-        if (now.includes(id) === (name === "expand")) return
+        if (now.includes(id) === (name === "expand")) return true
         yield* SubscriptionRef.set(expanded, name === "expand" ? [...now, id] : now.filter((one) => one !== id))
+        return true
       })
     return {
       changes: Stream.merge(changes, changesOf(expanded)),

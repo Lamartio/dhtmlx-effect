@@ -51,7 +51,8 @@ const bind = <R extends Row, C extends Collection>(kind: string, make: () => C, 
       Stream.zipWithPrevious,
       Stream.runForEach(([before, after]) =>
         Effect.sync(() => {
-          if (Option.isNone(before)) {
+          // The same value again (a refused action in another frame) draws all again: the widget may show a change that did not happen.
+          if (Option.isNone(before) || before.value === after) {
             data.removeAll()
             if (data instanceof TreeCollection) apply(data, diffRows([], after), map)
             else data.parse(after.map((row) => itemOf(row, map)))

@@ -9,7 +9,7 @@ export type ValueModel<A> = {
   /** The value. The renderer shows each change of it, and the caller can set it too. */
   readonly value: SubscriptionRef.SubscriptionRef<A>
   /** What the user does: chooses a value. A value that is the same as the one now changes nothing. */
-  readonly set: (value: A) => Effect.Effect<void>
+  readonly set: (value: A) => Effect.Effect<boolean>
   /** The last entries, as many as `history` says. */
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   /** The state now, to compare, or to hash with `hashOf`. */
@@ -46,9 +46,10 @@ export const valueModel = <A>(
       value,
       set: (next) =>
         Effect.gen(function* () {
-          if (rules.accepts !== undefined && !rules.accepts(next)) return
+          if (rules.accepts !== undefined && !rules.accepts(next)) return false
           yield* log.record({ _tag: "action", name: "set", value: next })
           if (!same(yield* SubscriptionRef.get(value), next)) yield* SubscriptionRef.set(value, next)
+          return true
         }),
       recent: log.recent,
       snapshot: Effect.map(SubscriptionRef.get(value), (now) => ({ value: now })),

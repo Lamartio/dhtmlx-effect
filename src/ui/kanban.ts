@@ -103,7 +103,8 @@ export const renderKanban = <R extends Row>(model: KanbanModel<R>, options: Kanb
       Stream.zipWithPrevious,
       Stream.runForEach(([before, after]) =>
         Effect.sync(() => {
-          if (Option.isNone(before)) {
+          // The same value again (a refused action in another frame) draws all again: the widget may show a change that did not happen.
+          if (Option.isNone(before) || before.value === after) {
             board.parse({ cards: after.map(card) as never })
             return
           }

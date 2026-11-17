@@ -32,11 +32,11 @@ export type KanbanModel<R extends Row> = {
    * the lane) of the row. A row, a column or a lane that is not there, or a full column with
    * `strictLimit`, changes nothing.
    */
-  readonly move: (id: string, column: string, lane?: string) => Effect.Effect<void>
+  readonly move: (id: string, column: string, lane?: string) => Effect.Effect<boolean>
   /** Chooses a card, or none. A card that is not there changes nothing. */
-  readonly select: (id: string | undefined) => Effect.Effect<void>
+  readonly select: (id: string | undefined) => Effect.Effect<boolean>
   /** Opens a card: it goes out in `opened`. A card that is not there changes nothing. */
-  readonly open: (id: string) => Effect.Effect<void>
+  readonly open: (id: string) => Effect.Effect<boolean>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<KanbanState<R>>
   /** One `void` on each change of the state: see `changesOf`. */
@@ -80,27 +80,30 @@ export const kanbanModel = <R extends Row>(options: KanbanModelOptions<R>): Effe
           const all = yield* SubscriptionRef.get(rows)
           const row = all.find((one) => one.id === id)
           const target = options.columns.find((one) => one.id === column)
-          if (row === undefined || target === undefined) return
-          if (lane !== undefined && to !== undefined && !options.lanes!.rows.some((one) => one.id === to)) return
+          if (row === undefined || target === undefined) return false
+          if (lane !== undefined && to !== undefined && !options.lanes!.rows.some((one) => one.id === to)) return false
           const moved = { [options.field]: column, ...(lane === undefined || to === undefined ? {} : { [lane]: to }) }
-          if (Object.entries(moved).every(([key, value]) => String(row[key as keyof R]) === value)) return
+          if (Object.entries(moved).every(([key, value]) => String(row[key as keyof R]) === value)) return true
           const inColumn = all.filter((one) => one.id !== id && String(one[options.field]) === column).length
-          if (target.strictLimit === true && target.limit !== undefined && String(row[options.field]) !== column && inColumn >= target.limit) return
+          if (target.strictLimit === true && target.limit !== undefined && String(row[options.field]) !== column && inColumn >= target.limit) return false
           yield* action("move", { id, column, ...(to === undefined ? {} : { lane: to }) })
           yield* SubscriptionRef.set(rows, all.map((one) => (one.id === id ? { ...one, ...moved } : one)))
+          return true
         }),
       select: (id) =>
         Effect.gen(function* () {
-          if (id !== undefined && (yield* find(id)) === undefined) return
+          if (id !== undefined && (yield* find(id)) === undefined) return false
           yield* action("select", id)
           if ((yield* SubscriptionRef.get(selected)) !== id) yield* SubscriptionRef.set(selected, id)
+          return true
         }),
       open: (id) =>
         Effect.gen(function* () {
-          if ((yield* find(id)) === undefined) return
+          if ((yield* find(id)) === undefined) return false
           yield* action("open", id)
           yield* PubSub.publish(opened, id)
           yield* log.record({ _tag: "event", name: "opened", value: id })
+          return true
         }),
       recent: log.recent,
       snapshot: Effect.all({ selected: SubscriptionRef.get(selected), rows: SubscriptionRef.get(rows) }),

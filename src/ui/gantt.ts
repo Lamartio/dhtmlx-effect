@@ -43,7 +43,7 @@ export const renderGantt = (model: GanttModel) =>
         Effect.sync(() => {
           applying = true
           try {
-            if (Option.isNone(before)) showPlan(chart, after)
+            if (Option.isNone(before) || before.value === after) showPlan(chart, after)
             else applyPlan(chart, diffPlan(before.value, after))
           } finally {
             applying = false

@@ -1,5 +1,5 @@
 import { Context, Effect, PubSub, Queue, Ref, type Scope, Stream } from "effect"
-import { stableJson } from "./model"
+import { dispatch, stableJson } from "./model"
 import { apply, diff, type Patch, toJson } from "./patch"
 
 /**
@@ -32,12 +32,25 @@ export type FullMessage = { readonly _tag: "full"; readonly seq: number; readonl
 export type PatchMessage = { readonly _tag: "patch"; readonly seq: number; readonly patch: Patch; readonly hash: string }
 export type StateMessage = FullMessage | PatchMessage
 
-/** What the registry needs of a model: its state now, and a signal when it may have changed. */
-export type Part = { readonly snapshot: Effect.Effect<unknown>; readonly changes: Stream.Stream<void> }
+/** What the registry needs of a model: its state now, a signal when it may have changed, and its actions by name. */
+export type Part = {
+  readonly snapshot: Effect.Effect<unknown>
+  readonly changes: Stream.Stream<void>
+  readonly dispatch?: (name: string, args: ReadonlyArray<unknown>) => Effect.Effect<boolean>
+}
+
+/** A model as a part, with the actions of its type: `partOf(grid, GRID_ACTIONS)`. */
+export const partOf = <M extends Part>(model: M, actions: ReadonlyArray<keyof M & string>): Part => ({
+  snapshot: model.snapshot,
+  changes: model.changes,
+  dispatch: (name, args) => dispatch(model, actions, name, args)
+})
 
 export class UiState extends Context.Service<UiState, {
   /** Puts a model in the document under `id` for the life of the scope. An id that is there already is a defect. */
   readonly register: (id: string, part: Part) => Effect.Effect<void, never, Scope.Scope>
+  /** Runs the action `name` of the part `id`. Gives false for an id or a name that is not there, and when the action refuses. */
+  readonly run: (id: string, name: string, args: ReadonlyArray<unknown>) => Effect.Effect<boolean>
   /** The whole state as it was last sent. */
   readonly full: Effect.Effect<FullMessage>
   /** Each patch after the subscribe. Take `full` after the subscribe, and drop the patches it has already. */
@@ -75,6 +88,7 @@ export const uiState = Effect.gen(function* () {
         )
         yield* part.changes.pipe(Stream.runForEach(() => Queue.offer(signal, undefined)), Effect.forkScoped({ startImmediately: true }))
       }),
+    run: (id, name, args) => parts.get(id)?.dispatch?.(name, args) ?? Effect.succeed(false),
     full: Effect.map(Ref.get(sent), ({ seq, state, hash }) => ({ _tag: "full" as const, seq, state, hash })),
     messages: Stream.fromPubSub(out)
   })

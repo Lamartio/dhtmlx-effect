@@ -110,7 +110,8 @@ export const renderScheduler = (model: SchedulerModel) =>
         Effect.sync(() => {
           current.events = after
           apply(() => {
-            if (Option.isNone(before)) {
+            // The same value again (a refused action in another frame) draws all again: the widget may show a change that did not happen.
+            if (Option.isNone(before) || before.value === after) {
               chart.clearAll()
               chart.parse(after.map(show))
               return

@@ -46,13 +46,13 @@ export type GridModel = {
   /** Each cell that the user changed. The store is the truth: the app writes the new value into the rows. */
   readonly edits: Stream.Stream<GridEdit>
   /** Chooses a row, or none. A row that is not in the rows changes nothing. */
-  readonly select: (id: string | undefined) => Effect.Effect<void>
+  readonly select: (id: string | undefined) => Effect.Effect<boolean>
   /** Sorts on a column. With no `dir` a second sort on the same column turns the order around. A column that is not sortable changes nothing. */
-  readonly sortBy: (column: string, dir?: "asc" | "desc") => Effect.Effect<void>
+  readonly sortBy: (column: string, dir?: "asc" | "desc") => Effect.Effect<boolean>
   /** The text of the filter of a column; an empty text clears it. A column with no filter changes nothing. */
-  readonly filter: (column: string, text: string) => Effect.Effect<void>
+  readonly filter: (column: string, text: string) => Effect.Effect<boolean>
   /** Changes a cell. A column that is not editable, or a row that is not there, changes nothing. */
-  readonly edit: (row: string, column: string, value: unknown) => Effect.Effect<void>
+  readonly edit: (row: string, column: string, value: unknown) => Effect.Effect<boolean>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<GridState>
   /** One `void` on each change of the state: see `changesOf`. */
@@ -97,28 +97,31 @@ export const gridModel = <R extends { readonly id: string }>(options: GridModelO
       sortBy: (id, dir) =>
         Effect.gen(function* () {
           const col = column(id)
-          if (col === undefined || col.sortable === false) return
+          if (col === undefined || col.sortable === false) return false
           const now = yield* SubscriptionRef.get(sort)
           const next: GridSort = { column: id, dir: dir ?? (now?.column === id && now.dir === "asc" ? "desc" : "asc") }
           yield* action("sortBy", next)
           if (now?.column !== next.column || now.dir !== next.dir) yield* SubscriptionRef.set(sort, next)
+          return true
         }),
       filter: (id, text) =>
         Effect.gen(function* () {
-          if (column(id)?.filter === undefined) return
+          if (column(id)?.filter === undefined) return false
           yield* action("filter", { column: id, text })
           const now = yield* SubscriptionRef.get(filters)
-          if ((now[id] ?? "") === text) return
+          if ((now[id] ?? "") === text) return true
           const { [id]: _, ...rest } = now
           yield* SubscriptionRef.set(filters, text === "" ? rest : { ...rest, [id]: text })
+          return true
         }),
       edit: (row, id, value) =>
         Effect.gen(function* () {
-          if (column(id)?.editable !== true || !(yield* has(row))) return
+          if (column(id)?.editable !== true || !(yield* has(row))) return false
           const edit = { row, column: id, value }
           yield* action("edit", edit)
           yield* PubSub.publish(edits, edit)
           yield* log.record({ _tag: "event", name: "edits", value: edit })
+          return true
         }),
       recent: log.recent,
       snapshot: Effect.gen(function* () {

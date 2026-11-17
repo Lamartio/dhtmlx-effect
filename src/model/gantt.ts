@@ -42,14 +42,14 @@ export type GanttModel = {
   /** The plan. The model holds it all: a plan is small. */
   readonly tasks: SubscriptionRef.SubscriptionRef<ReadonlyArray<Task>>
   readonly zoom: SubscriptionRef.SubscriptionRef<Zoom>
-  readonly zoomIn: Effect.Effect<void>
-  readonly zoomOut: Effect.Effect<void>
-  /** A new task of two days, from `now`. */
-  readonly addTask: (text: string, now: Date) => Effect.Effect<void>
+  readonly zoomIn: Effect.Effect<boolean>
+  readonly zoomOut: Effect.Effect<boolean>
+  /** A new task of two days, from `now` (a `Date`, or an ISO string as it comes over the wire). */
+  readonly addTask: (text: string, now: Date | string) => Effect.Effect<boolean>
   /** A task that the user made, moved, resized or renamed. A task under a parent that is not in the plan changes nothing. */
-  readonly putTask: (task: Task) => Effect.Effect<void>
+  readonly putTask: (task: Task) => Effect.Effect<boolean>
   /** Takes a task and its children out. A task that is not in the plan changes nothing. */
-  readonly removeTask: (id: string) => Effect.Effect<void>
+  readonly removeTask: (id: string) => Effect.Effect<boolean>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<GanttState>
   /** One `void` on each change of the state: see `changesOf`. */
@@ -81,6 +81,7 @@ export const ganttModel = (options: GanttModelOptions): Effect.Effect<GanttModel
         yield* action(name, undefined)
         const now = yield* SubscriptionRef.get(zoom)
         if (zoomStep(now, by) !== now) yield* SubscriptionRef.set(zoom, zoomStep(now, by))
+        return true
       })
     const has = (id: string) => Effect.map(SubscriptionRef.get(tasks), (all) => all.some((task) => task.id === id))
     return {
@@ -91,19 +92,22 @@ export const ganttModel = (options: GanttModelOptions): Effect.Effect<GanttModel
       addTask: (text, now) =>
         Effect.gen(function* () {
           yield* action("addTask", text)
-          yield* SubscriptionRef.update(tasks, (all) => withNewTask(all, text, now))
+          yield* SubscriptionRef.update(tasks, (all) => withNewTask(all, text, new Date(now)))
+          return true
         }),
       putTask: (task) =>
         Effect.gen(function* () {
-          if (task.parent !== undefined && !(yield* has(task.parent))) return
+          if (task.parent !== undefined && !(yield* has(task.parent))) return false
           yield* action("putTask", task)
           yield* SubscriptionRef.update(tasks, (all) => planWith(all, { put: task }))
+          return true
         }),
       removeTask: (id) =>
         Effect.gen(function* () {
-          if (!(yield* has(id))) return
+          if (!(yield* has(id))) return false
           yield* action("removeTask", id)
           yield* SubscriptionRef.update(tasks, (all) => planWith(all, { remove: id }))
+          return true
         }),
       recent: log.recent,
       snapshot: Effect.all({ zoom: SubscriptionRef.get(zoom), tasks: SubscriptionRef.get(tasks) }),

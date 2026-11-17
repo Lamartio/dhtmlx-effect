@@ -21,15 +21,15 @@ export type SchedulerModel = {
   readonly date: SubscriptionRef.SubscriptionRef<string>
   /** The id of each event that the user opens. */
   readonly opened: Stream.Stream<string>
-  readonly showView: (view: SchedulerView) => Effect.Effect<void>
+  readonly showView: (view: SchedulerView) => Effect.Effect<boolean>
   /** A day that is not `YYYY-MM-DD` changes nothing. */
-  readonly showDate: (date: string) => Effect.Effect<void>
+  readonly showDate: (date: string) => Effect.Effect<boolean>
   /** An event that the user moved or resized. An event that is not there, or that ends before it starts, changes nothing. */
-  readonly updateEvent: (event: CalendarEvent) => Effect.Effect<void>
+  readonly updateEvent: (event: CalendarEvent) => Effect.Effect<boolean>
   /** An event that is not there changes nothing. */
-  readonly removeEvent: (id: string) => Effect.Effect<void>
+  readonly removeEvent: (id: string) => Effect.Effect<boolean>
   /** Opens an event: it goes out in `opened`. An event that is not there changes nothing. */
-  readonly open: (id: string) => Effect.Effect<void>
+  readonly open: (id: string) => Effect.Effect<boolean>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<SchedulerState>
   /** One `void` on each change of the state: see `changesOf`. */
@@ -63,7 +63,7 @@ export const schedulerModel = (options: SchedulerModelOptions): Effect.Effect<Sc
     const action = (name: string, value: unknown) => log.record({ _tag: "action", name, value })
     const has = (id: string) => Effect.map(SubscriptionRef.get(events), (all) => all.some((event) => event.id === id))
     const set = <A>(ref: SubscriptionRef.SubscriptionRef<A>, value: A) =>
-      Effect.flatMap(SubscriptionRef.get(ref), (now) => (now === value ? Effect.void : SubscriptionRef.set(ref, value)))
+      Effect.flatMap(SubscriptionRef.get(ref), (now) => (now === value ? Effect.void : SubscriptionRef.set(ref, value))).pipe(Effect.as(true))
     return {
       events,
       view,
@@ -71,25 +71,28 @@ export const schedulerModel = (options: SchedulerModelOptions): Effect.Effect<Sc
       opened: Stream.fromPubSub(opened),
       showView: (next) => action("showView", next).pipe(Effect.andThen(set(view, next))),
       showDate: (next) =>
-        /^\d{4}-\d{2}-\d{2}$/.test(next) ? action("showDate", next).pipe(Effect.andThen(set(date, next))) : Effect.void,
+        /^\d{4}-\d{2}-\d{2}$/.test(next) ? action("showDate", next).pipe(Effect.andThen(set(date, next))) : Effect.succeed(false),
       updateEvent: (event) =>
         Effect.gen(function* () {
-          if (!(yield* has(event.id)) || Date.parse(event.end) < Date.parse(event.start)) return
+          if (!(yield* has(event.id)) || Date.parse(event.end) < Date.parse(event.start)) return false
           yield* action("updateEvent", event)
           yield* SubscriptionRef.update(events, (all) => all.map((one) => (one.id === event.id ? event : one)))
+          return true
         }),
       removeEvent: (id) =>
         Effect.gen(function* () {
-          if (!(yield* has(id))) return
+          if (!(yield* has(id))) return false
           yield* action("removeEvent", id)
           yield* SubscriptionRef.update(events, (all) => all.filter((one) => one.id !== id))
+          return true
         }),
       open: (id) =>
         Effect.gen(function* () {
-          if (!(yield* has(id))) return
+          if (!(yield* has(id))) return false
           yield* action("open", id)
           yield* PubSub.publish(opened, id)
           yield* log.record({ _tag: "event", name: "opened", value: id })
+          return true
         }),
       recent: log.recent,
       snapshot: Effect.all({ view: SubscriptionRef.get(view), date: SubscriptionRef.get(date), events: SubscriptionRef.get(events) }),

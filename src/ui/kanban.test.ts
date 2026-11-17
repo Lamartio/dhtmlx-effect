@@ -6,7 +6,10 @@ import "../styles.css"
 import "../storybook.css"
 import { Browser, browserWith, setFacts, type BrowserFacts } from "./browser"
 import { alive, Host, mount } from "./host"
-import { kanban, kanbanLanguage, kanbanToolbar } from "./kanban"
+import { kanban, kanbanLanguage, kanbanToolbar, renderKanban } from "./kanban"
+import { KANBAN_ACTIONS, kanbanModel } from "../model/kanban"
+import { connectHost, type HostMessage, memoryChannel, type PluginMessage, remoteKanban, servePlugin } from "../model/remote"
+import { partOf, uiState } from "../model/ui-state"
 
 const FACTS: BrowserFacts = {
   dark: false,
@@ -143,4 +146,29 @@ it.live("keeps the lane of a card and the store the same, shows the fields of a 
     }).pipe(Effect.provideService(Host, host), Effect.provideService(Browser, facts)))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
     expect(bar.innerHTML).toBe("")
+  }))
+
+it.live("draws a card back when the plugin refuses its move, with the Kanban on a remote model", () =>
+  Effect.gen(function* () {
+    const host = freshHost()
+    const facts = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      // The plugin has a strict limit on doing; the page does not know it, so DHTMLX lets the drag in.
+      const ui = yield* uiState
+      const plugin = yield* kanbanModel<Issue>({ rows: ISSUES, field: "status", columns: COLUMNS.map((column) => (column.id === "doing" ? { ...column, limit: 1, strictLimit: true } : column)) })
+      yield* ui.register("board", partOf(plugin, KANBAN_ACTIONS))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, pluginEnd)
+      const remote = yield* remoteKanban<Issue>(page, "board")
+      const { kanban: board } = yield* renderKanban(remote, { field: "status", columns: COLUMNS, label: (row) => `${row.id} ${row.title}` })
+      yield* settle
+      const before = ISSUES.find((one) => one.status !== "doing")!
+      yield* Effect.promise(() => board.api.exec("move-card", { id: `card:${before.id}`, columnId: "doing" }))
+      yield* settle
+      yield* settle
+      expect((board.getCard(`card:${before.id}`) as unknown as Issue).status).toBe(before.status)
+      expect((yield* plugin.snapshot).rows.find((one) => one.id === before.id)?.status).toBe(before.status)
+    }).pipe(Effect.provideService(Host, host), Effect.provideService(Browser, facts)))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))
