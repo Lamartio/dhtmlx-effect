@@ -42,6 +42,7 @@ The package ships TypeScript source, so use a bundler that reads TypeScript (Vit
 | `dhtmlx-effect/pivot` | `@dhtmlx/pivot` | Pivot table |
 | `dhtmlx-effect/spreadsheet` | `@dhtmlx/spreadsheet` | Spreadsheet |
 | `dhtmlx-effect/vault` | `@dhtmlx/vault` | Vault, the file uploader |
+| `dhtmlx-effect/headless` | `effect` | The models of the widgets, with no DHTMLX: for now Calendar, Timepicker, Slider, Colorpicker and Combobox |
 | `dhtmlx-effect/storybook` | `@storybook/html-vite` | Stories that are Effect trees, with the Browser layer in the toolbar |
 | `dhtmlx-effect/styles.css` | | The few styles of the wrappers. Load it after the CSS of DHTMLX |
 
@@ -127,6 +128,20 @@ A child that may only be in one parent requires a service that only that parent 
 ### One store, many widgets
 
 `dataCollection(rows)` and `treeCollection(rows)` drive a DHTMLX data collection from a `SubscriptionRef` of rows, as changes by id. A Grid, a List and a DataView on the same collection each draw only what changed.
+
+### Headless models
+
+A widget is a model and a renderer. The model (`dhtmlx-effect/headless`) holds the input, the state and the actions of the user as plain Effects, with no DHTMLX, so a unit test runs in Node with no page. The renderer puts the state into the DHTMLX widget, and turns each change by the user into an action. The model holds intent: DHTMLX keeps its own state, such as the scroll and the focus.
+
+```ts
+const model = yield* sliderModel({ value: 3, history: 10 })
+yield* model.set(5)                      // what the user does
+yield* model.snapshot                    // { value: 5 }
+yield* model.recent                      // the last inputs and actions
+yield* hashOf(yield* model.snapshot)     // a SHA-256, to compare a state before and after
+```
+
+An option can be a value, a `SubscriptionRef` that both sides share, or a `Stream` (`input`). Each widget gives its model too: `slider(options)` gives `{ slider, value, model }`.
 
 ### A widget never stops in silence
 

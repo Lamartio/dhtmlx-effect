@@ -1,38 +1,32 @@
 import { Calendar, Colorpicker, Combobox, i18n, setTheme, Slider, Timepicker, Uploader } from "dhx-suite"
 import { Effect, PubSub, Scope, Stream, SubscriptionRef } from "effect"
+import { calendarModel, colorpickerModel, comboboxModel, sliderModel, timepickerModel, type ValueModel, type ValueOptions } from "../model/inputs"
 import { calendarLocale, dateToDay, dayToDate, zoned } from "../core/form"
 import { Browser, follow } from "./browser"
 import { button } from "./button"
 import { child, Host, resource } from "./host"
 
 /**
- * The inputs of a form, alone: Calendar, Timepicker, Slider, Colorpicker and Combobox.
- * Each one keeps its value in a `SubscriptionRef`, both ways: a change by the user sets it, and a new
- * value shows in the widget. A value that came from the ref is not sent back.
+ * The inputs of a form, alone: Calendar, Timepicker, Slider, Colorpicker and Combobox. Each one is
+ * its model (`src/model/inputs.ts`) and a renderer: a change by the user is the action `set` of the
+ * model, and each new value of the model shows in the widget. A value that came from the model is
+ * not sent back. Each gives its model, for its history and its snapshot.
  */
 type Events = { readonly on: (name: never, f: (...args: Array<never>) => void) => void; readonly detach: (name: never) => void }
 
-const twoWay = <A, W>(
-  widget: W & { readonly events: Events },
-  ref: SubscriptionRef.SubscriptionRef<A>,
-  read: () => A,
-  write: (value: A) => void,
-  same: (a: A, b: A) => boolean = Object.is
-) =>
+const twoWay = <A, W>(widget: W & { readonly events: Events }, model: ValueModel<A>, read: () => A, write: (value: A) => void) =>
   Effect.gen(function* () {
     let applying = false
     yield* resource(
       "listener",
       () =>
         widget.events.on("change" as never, () => {
-          if (applying) return
-          const value = read()
-          if (!same(Effect.runSync(SubscriptionRef.get(ref)), value)) Effect.runSync(SubscriptionRef.set(ref, value))
+          if (!applying) Effect.runSync(model.set(read()))
         }),
       () => widget.events.detach("change" as never)
     )
-    yield* follow(ref, (value) => {
-      if (same(read(), value)) return
+    yield* follow(model.value, (value) => {
+      if (Object.is(read(), value)) return
       applying = true
       try {
         write(value)
@@ -60,11 +54,12 @@ export const calendarNames = (locale: string) => {
  * days and the first day of the week follow the locale of `Browser`; with no day, it opens on the
  * day of `Browser.now` in `Browser.timeZone`.
  */
-export const calendar = (options: { readonly value?: SubscriptionRef.SubscriptionRef<string | undefined> } = {}) =>
+export const calendar = (options: ValueOptions<string | undefined> = {}) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const value = options.value ?? (yield* SubscriptionRef.make<string | undefined>(undefined))
+    const model = yield* calendarModel(options)
+    const value = model.value
     const names = calendarNames(yield* SubscriptionRef.get(browser.locale))
     const start = yield* SubscriptionRef.get(value)
     const view = yield* resource(
@@ -77,7 +72,7 @@ export const calendar = (options: { readonly value?: SubscriptionRef.Subscriptio
       const date = view.getValue(true) as Date | undefined
       return date instanceof Date ? dateToDay(date) : undefined
     }
-    yield* twoWay(view as never, value, read, (day) => {
+    yield* twoWay(view as never, model, read, (day) => {
       if (day === undefined) view.clear()
       else view.setValue(dayToDate(day))
     })
@@ -93,17 +88,18 @@ export const calendar = (options: { readonly value?: SubscriptionRef.Subscriptio
       return zoned(now, zone).day
     })
     if (start === undefined) view.showDate(dayToDate(yield* today))
-    return { calendar: view, value }
-  }) as Effect.Effect<{ readonly calendar: Calendar; readonly value: SubscriptionRef.SubscriptionRef<string | undefined> }, never, Host | Browser | Scope.Scope>
+    return { calendar: view, value, model }
+  }) as Effect.Effect<{ readonly calendar: Calendar; readonly value: SubscriptionRef.SubscriptionRef<string | undefined>; readonly model: ValueModel<string | undefined> }, never, Host | Browser | Scope.Scope>
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
 /** A DHTMLX Timepicker. The time is `HH:mm`, 24 hours; the picker shows 12 or 24 hours, as the locale does. */
-export const timepicker = (options: { readonly value?: SubscriptionRef.SubscriptionRef<string> } = {}) =>
+export const timepicker = (options: ValueOptions<string> = {}) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const value = options.value ?? (yield* SubscriptionRef.make("09:00"))
+    const model = yield* timepickerModel(options)
+    const value = model.value
     const twelve = calendarLocale(yield* SubscriptionRef.get(browser.locale)).twelveHours
     const view = yield* resource(
       "timepicker",
@@ -119,7 +115,7 @@ export const timepicker = (options: { readonly value?: SubscriptionRef.Subscript
     // As a string: an object with no `AM` reads as PM in DHTMLX, so 09:30 showed as 21:30.
     const write = (time: string) => view.setValue(time)
     write(yield* SubscriptionRef.get(value))
-    yield* twoWay(view as never, value, read, write)
+    yield* twoWay(view as never, model, read, write)
     yield* follow(browser.locale, (locale) => {
       const next = calendarLocale(locale).twelveHours ? 12 : 24
       if (view.config.timeFormat === next) return
@@ -128,14 +124,15 @@ export const timepicker = (options: { readonly value?: SubscriptionRef.Subscript
       view.paint()
       write(keep)
     })
-    return { timepicker: view, value }
-  }) as Effect.Effect<{ readonly timepicker: Timepicker; readonly value: SubscriptionRef.SubscriptionRef<string> }, never, Host | Browser | Scope.Scope>
+    return { timepicker: view, value, model }
+  }) as Effect.Effect<{ readonly timepicker: Timepicker; readonly value: SubscriptionRef.SubscriptionRef<string>; readonly model: ValueModel<string> }, never, Host | Browser | Scope.Scope>
 
 /** A DHTMLX Slider with one thumb. */
-export const slider = (options: { readonly value?: SubscriptionRef.SubscriptionRef<number>; readonly min?: number; readonly max?: number; readonly step?: number; readonly label?: string }) =>
+export const slider = (options: ValueOptions<number> & { readonly min?: number; readonly max?: number; readonly step?: number; readonly label?: string }) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const value = options.value ?? (yield* SubscriptionRef.make(options.min ?? 0))
+    const model = yield* sliderModel(options)
+    const value = model.value
     const view = yield* resource(
       "slider",
       () =>
@@ -150,33 +147,39 @@ export const slider = (options: { readonly value?: SubscriptionRef.SubscriptionR
       (view) => view.destructor()
     )
     yield* themed
-    yield* twoWay(view as never, value, () => view.getValue()[0] ?? 0, (n) => view.setValue(n))
-    return { slider: view, value }
-  }) as Effect.Effect<{ readonly slider: Slider; readonly value: SubscriptionRef.SubscriptionRef<number> }, never, Host | Browser | Scope.Scope>
+    yield* twoWay(view as never, model, () => view.getValue()[0] ?? 0, (n) => view.setValue(n))
+    return { slider: view, value, model }
+  }) as Effect.Effect<{ readonly slider: Slider; readonly value: SubscriptionRef.SubscriptionRef<number>; readonly model: ValueModel<number> }, never, Host | Browser | Scope.Scope>
 
 /** A DHTMLX Colorpicker. The colour is `#rrggbb`. */
-export const colorpicker = (options: { readonly value?: SubscriptionRef.SubscriptionRef<string> } = {}) =>
+export const colorpicker = (options: ValueOptions<string> = {}) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const value = options.value ?? (yield* SubscriptionRef.make("#2e7dd1"))
+    const model = yield* colorpickerModel(options)
+    const value = model.value
     const view = yield* resource("colorpicker", () => new Colorpicker(host, { css: "dhxe-colorpicker" }), (view) => view.destructor())
     yield* themed
-    const read = () => String(view.getValue()).toLowerCase()
+    // DHTMLX gives the colour in capitals: give it back as the model has it, when it is the same colour.
+    const read = () => {
+      const shown = String(view.getValue())
+      const now = Effect.runSync(SubscriptionRef.get(value))
+      return shown.toLowerCase() === now.toLowerCase() ? now : shown.toLowerCase()
+    }
     view.setValue(Effect.runSync(SubscriptionRef.get(value)))
-    yield* twoWay(view as never, value, read, (color) => view.setValue(color), (a, b) => a.toLowerCase() === b.toLowerCase())
-    return { colorpicker: view, value }
-  }) as Effect.Effect<{ readonly colorpicker: Colorpicker; readonly value: SubscriptionRef.SubscriptionRef<string> }, never, Host | Browser | Scope.Scope>
+    yield* twoWay(view as never, model, read, (color) => view.setValue(color))
+    return { colorpicker: view, value, model }
+  }) as Effect.Effect<{ readonly colorpicker: Colorpicker; readonly value: SubscriptionRef.SubscriptionRef<string>; readonly model: ValueModel<string> }, never, Host | Browser | Scope.Scope>
 
 /** A DHTMLX Combobox with one choice: the value is the id of the chosen option, or undefined. */
 export const combobox = (options: {
   readonly options: ReadonlyArray<{ readonly value: string; readonly label: string }>
-  readonly value?: SubscriptionRef.SubscriptionRef<string | undefined>
   readonly label?: string
   readonly placeholder?: string
-}) =>
+} & ValueOptions<string | undefined>) =>
   Effect.gen(function* () {
     const host = yield* Host
-    const value = options.value ?? (yield* SubscriptionRef.make<string | undefined>(undefined))
+    const model = yield* comboboxModel(options)
+    const value = model.value
     const view = yield* resource(
       "combobox",
       () =>
@@ -192,12 +195,12 @@ export const combobox = (options: {
       const id = view.getValue() as unknown
       return id === undefined || id === null || id === "" ? undefined : String(Array.isArray(id) ? id[0] : id)
     }
-    yield* twoWay(view as never, value, read, (id) => {
+    yield* twoWay(view as never, model, read, (id) => {
       if (id === undefined) view.clear()
       else view.setValue(id)
     })
-    return { combobox: view, value }
-  }) as Effect.Effect<{ readonly combobox: Combobox; readonly value: SubscriptionRef.SubscriptionRef<string | undefined> }, never, Host | Browser | Scope.Scope>
+    return { combobox: view, value, model }
+  }) as Effect.Effect<{ readonly combobox: Combobox; readonly value: SubscriptionRef.SubscriptionRef<string | undefined>; readonly model: ValueModel<string | undefined> }, never, Host | Browser | Scope.Scope>
 
 /**
  * Picks files, with a button or a drop on the host: only the part of the DHTMLX Uploader that picks.

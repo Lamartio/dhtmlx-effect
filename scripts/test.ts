@@ -16,13 +16,14 @@ const browser = async () => {
 }
 
 const required = process.argv.includes("--require-browser")
+const only: Array<string> = []
 if (!(await browser())) {
   if (required) {
     console.error("dhtmlx-effect: no Chromium for Playwright here. Run: bunx playwright install chromium")
     process.exit(1)
   }
-  console.log("dhtmlx-effect: no Chromium for Playwright here, so the widget tests are skipped.")
-  process.exit(0)
+  console.log("dhtmlx-effect: no Chromium for Playwright here, so only the model tests run.")
+  only.push("--project", "model")
 }
-const run = Bun.spawnSync(["bun", "--bun", "vitest", "run", ...process.argv.slice(2).filter((arg) => arg !== "--require-browser")], { stdio: ["inherit", "inherit", "inherit"] })
+const run = Bun.spawnSync(["bun", "--bun", "vitest", "run", ...only, ...process.argv.slice(2).filter((arg) => arg !== "--require-browser")], { stdio: ["inherit", "inherit", "inherit"] })
 process.exit(run.exitCode ?? 1)

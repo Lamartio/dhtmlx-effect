@@ -145,7 +145,7 @@ it.live("keeps the values of a Timepicker, a Slider, a Colorpicker and a Combobo
     const points = yield* SubscriptionRef.make(3)
     const color = yield* SubscriptionRef.make("#ff0000")
     const status = yield* SubscriptionRef.make<string | undefined>("todo")
-    const t = yield* timepicker({ value: time })
+    const t = yield* timepicker({ value: time, history: 10 })
     const s = yield* slider({ value: points, min: 0, max: 13 })
     const c = yield* colorpicker({ value: color })
     const o = yield* combobox({ value: status, options: [{ value: "todo", label: "To do" }, { value: "done", label: "Done" }] })
@@ -166,6 +166,8 @@ it.live("keeps the values of a Timepicker, a Slider, a Colorpicker and a Combobo
     expect(yield* SubscriptionRef.get(time)).toBe("08:15")
     expect(yield* SubscriptionRef.get(points)).toBe(5)
     expect(yield* SubscriptionRef.get(color)).toBe("#00ff00")
+    // A change by the user is the action of the model.
+    expect(yield* t.model.recent).toContainEqual({ _tag: "action", name: "set", value: "08:15" })
   }), { ...FACTS, locale: "en-GB" }))
 
 it.live("gives each file that is picked, and keeps none", () =>
