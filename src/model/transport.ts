@@ -17,13 +17,15 @@ const PatchOpSchema = Schema.Union([
 export const PluginMessageSchema = Schema.Union([
   Schema.TaggedStruct("full", { seq: Schema.Number, state: Schema.Unknown, hash: Schema.String }),
   Schema.TaggedStruct("patch", { seq: Schema.Number, patch: Schema.Array(PatchOpSchema), hash: Schema.String }),
-  Schema.TaggedStruct("answer", { n: Schema.Number, accepted: Schema.Boolean })
+  Schema.TaggedStruct("answer", { n: Schema.Number, accepted: Schema.Boolean }),
+  Schema.TaggedStruct("ask", { n: Schema.Number, kind: Schema.Literals(["confirm", "alert", "message"]), options: Schema.Record(Schema.String, Schema.Unknown) })
 ])
 
 /** What the page sends: the actions of the user, and a request for the whole state. */
 export const HostMessageSchema = Schema.Union([
   Schema.TaggedStruct("action", { n: Schema.Number, id: Schema.String, action: Schema.String, args: Schema.Array(Schema.Unknown) }),
-  Schema.TaggedStruct("resync", {})
+  Schema.TaggedStruct("resync", {}),
+  Schema.TaggedStruct("reply", { n: Schema.Number, answer: Schema.Boolean })
 ])
 
 /**

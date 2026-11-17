@@ -4,8 +4,8 @@
  */
 export * from "./model/patch"
 export * from "./model/states"
-export { checksum, type FullMessage, type Mirror, type PatchMessage, receive, type StateMessage } from "./model/ui-state"
-export type { ActionMessage, AnswerMessage, Channel, HostMessage, PluginMessage, ResyncMessage } from "./model/remote"
+export { type AskMessage, checksum, type FullMessage, MAX_OPEN_ASKS, type Mirror, type PatchMessage, receive, type StateMessage } from "./model/ui-state"
+export type { ActionMessage, AnswerMessage, Channel, HostMessage, PluginMessage, ReplyMessage, ResyncMessage } from "./model/remote"
 export { HostMessageSchema, PluginMessageSchema } from "./model/transport"
 export {
   type FrameNode, type LayoutNode, type SidebarNode, type TabbarNode, TREE_KEY, type UiNode, UiNodeSchema, type WidgetNode, WidgetNodeSchema, WireNodes

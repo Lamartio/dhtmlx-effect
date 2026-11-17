@@ -1,4 +1,4 @@
-import { Context, Effect, PubSub, Queue, Ref, type Scope, Stream } from "effect"
+import { Context, Deferred, Effect, PubSub, Queue, Ref, type Scope, Stream } from "effect"
 import { dispatch, stableJson } from "./model"
 import { apply, diff, type Patch, toJson } from "./patch"
 
@@ -31,6 +31,11 @@ export type FullMessage = { readonly _tag: "full"; readonly seq: number; readonl
 /** A change: the patch from the state of `seq - 1`. */
 export type PatchMessage = { readonly _tag: "patch"; readonly seq: number; readonly patch: Patch; readonly hash: string }
 export type StateMessage = FullMessage | PatchMessage
+/** The plugin asks the user something: a `confirm` and an `alert` wait for the `reply` of `n`, a `message` does not. */
+export type AskMessage = { readonly _tag: "ask"; readonly n: number; readonly kind: "confirm" | "alert" | "message"; readonly options: Readonly<Record<string, unknown>> }
+
+/** The most questions of a plugin that wait at one time. One more is answered at once: no. */
+export const MAX_OPEN_ASKS = 3
 
 /** What the registry needs of a model: its state now, a signal when it may have changed, and its actions by name. */
 export type Part = {
@@ -53,15 +58,21 @@ export class UiState extends Context.Service<UiState, {
   readonly run: (id: string, name: string, args: ReadonlyArray<unknown>) => Effect.Effect<boolean>
   /** The whole state as it was last sent. */
   readonly full: Effect.Effect<FullMessage>
-  /** Each patch after the subscribe. Take `full` after the subscribe, and drop the patches it has already. */
-  readonly messages: Stream.Stream<PatchMessage>
+  /** Each patch and each question after the subscribe. Take `full` after the subscribe, and drop the patches it has already. */
+  readonly messages: Stream.Stream<PatchMessage | AskMessage>
+  /** Asks the user in the page, and gives the answer: true for the first button of a confirm. A message gives true at once. */
+  readonly ask: (kind: AskMessage["kind"], options: object) => Effect.Effect<boolean>
+  /** The answer of the page to the question `n`. */
+  readonly reply: (n: number, answer: boolean) => Effect.Effect<void>
 }>()("dhtmlx-effect/UiState") {}
 
 /** A registry for the life of the scope. */
 export const uiState = Effect.gen(function* () {
   const parts = new Map<string, Part>()
   const signal = yield* Queue.unbounded<void>()
-  const out = yield* Effect.acquireRelease(PubSub.unbounded<PatchMessage>(), PubSub.shutdown)
+  const out = yield* Effect.acquireRelease(PubSub.unbounded<PatchMessage | AskMessage>(), PubSub.shutdown)
+  const open = new Map<number, Deferred.Deferred<boolean>>()
+  let asked = 0
   const sent = yield* Ref.make<{ readonly seq: number; readonly state: unknown; readonly hash: string }>({ seq: 0, state: {}, hash: checksum({}) })
   const flush = Effect.gen(function* () {
     yield* Queue.take(signal)
@@ -90,7 +101,19 @@ export const uiState = Effect.gen(function* () {
       }),
     run: (id, name, args) => parts.get(id)?.dispatch?.(name, args) ?? Effect.succeed(false),
     full: Effect.map(Ref.get(sent), ({ seq, state, hash }) => ({ _tag: "full" as const, seq, state, hash })),
-    messages: Stream.fromPubSub(out)
+    messages: Stream.fromPubSub(out),
+    ask: (kind, options) =>
+      Effect.gen(function* () {
+        const n = ++asked
+        if (kind === "message") return yield* PubSub.publish(out, { _tag: "ask", n, kind, options: { ...options } }).pipe(Effect.as(true))
+        if (open.size >= MAX_OPEN_ASKS) return false
+        const answer = yield* Deferred.make<boolean>()
+        open.set(n, answer)
+        yield* PubSub.publish(out, { _tag: "ask", n, kind, options: { ...options } })
+        // ponytail: an interrupt here forgets the question, and the dialog stays open in the page; send a close if that shows.
+        return yield* Deferred.await(answer).pipe(Effect.ensuring(Effect.sync(() => open.delete(n))))
+      }),
+    reply: (n, answer) => Effect.suspend(() => (open.has(n) ? Effect.asVoid(Deferred.succeed(open.get(n)!, answer)) : Effect.void))
   })
 })
 

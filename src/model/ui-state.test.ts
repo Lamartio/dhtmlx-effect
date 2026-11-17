@@ -3,7 +3,7 @@ import { Effect, Exit, Fiber, Scope, Stream } from "effect"
 import { expect } from "vitest"
 import { gridModel } from "./grid"
 import { sliderModel } from "./inputs"
-import { type Mirror, receive, type StateMessage, uiState } from "./ui-state"
+import { type Mirror, type PatchMessage, receive, type StateMessage, uiState } from "./ui-state"
 
 const COLUMNS = [{ id: "title", header: "Title" }]
 
@@ -25,7 +25,7 @@ it.effect("sends the changes of one tick in one message, and the copy on the oth
     yield* grid.sortBy("title")
     yield* slider.set(8)
     yield* settle
-    const messages = [...(yield* Fiber.join(got))]
+    const messages = [...(yield* Fiber.join(got))] as Array<PatchMessage>
     expect(messages.map((message) => message.seq)).toEqual([1, 2])
     expect(messages[1]!.patch.map((op) => op.path)).toEqual(["/grid/selected", "/grid/sort", "/slider/value"])
     let mirror: Mirror | "resync" | undefined = { seq: 0, state: {} }

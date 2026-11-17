@@ -1,25 +1,9 @@
 import { alert as dhxAlert, confirm as dhxConfirm, message as dhxMessage, setTheme, tooltip as dhxTooltip } from "dhx-suite"
-import { Context, Effect, Layer, Queue, SubscriptionRef } from "effect"
+import { Effect, Layer, Queue, SubscriptionRef } from "effect"
+import { Dialogs } from "../model/dialogs"
 import { Browser } from "./browser"
 
-/**
- * Messages and questions to the user as Effects. A widget asks the `Dialogs` service and
- * does not call DHTMLX: the app gives the live layer, a test gives answers. `confirm` gives the answer
- * of the user; an interrupt closes the question, as a click on the second button does.
- */
-export type ConfirmOptions = {
-  readonly text: string
-  readonly header?: string
-  /** The yes and the no button. */
-  readonly buttons?: readonly [string, string]
-}
-
-export class Dialogs extends Context.Service<Dialogs, {
-  readonly confirm: (options: ConfirmOptions) => Effect.Effect<boolean>
-  readonly alert: (options: { readonly text: string; readonly header?: string; readonly button?: string }) => Effect.Effect<void>
-  /** A short note in a corner of the page, that goes after `expire` ms. */
-  readonly message: (options: { readonly text: string; readonly expire?: number; readonly kind?: "info" | "success" | "danger" }) => Effect.Effect<void>
-}>()("dhtmlx-effect/Dialogs") {}
+export { type AlertOptions, type ConfirmOptions, Dialogs, type MessageOptions } from "../model/dialogs"
 
 /** The newest dialog of DHTMLX in the page: its buttons answer it, its blocker shuts it. */
 const newestDialog = () => {

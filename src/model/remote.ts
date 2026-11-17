@@ -18,7 +18,7 @@ import { KANBAN_ACTIONS, type KanbanModel } from "./kanban"
 import { changesOf, type Entry, stableJson } from "./model"
 import { type CalendarEvent, SCHEDULER_ACTIONS, type SchedulerModel, type SchedulerView } from "./scheduler"
 import { SELECTION_ACTIONS, type SelectionModel, TREE_ACTIONS, type TreeModel } from "./selection"
-import { type Mirror, receive, type StateMessage, type UiState } from "./ui-state"
+import { type AskMessage, type Mirror, receive, type StateMessage, type UiState } from "./ui-state"
 
 /**
  * A plugin and a page in two frames. The plugin has the models (the truth) and sends their state as
@@ -33,10 +33,13 @@ export type ResyncMessage = { readonly _tag: "resync" }
 /** The answer of the plugin to the action `n`: did the model take it. */
 export type AnswerMessage = { readonly _tag: "answer"; readonly n: number; readonly accepted: boolean }
 
+/** The answer of the user to the question `n` of the plugin. */
+export type ReplyMessage = { readonly _tag: "reply"; readonly n: number; readonly answer: boolean }
+
 /** From the page to the plugin. */
-export type HostMessage = ActionMessage | ResyncMessage
+export type HostMessage = ActionMessage | ResyncMessage | ReplyMessage
 /** From the plugin to the page. */
-export type PluginMessage = StateMessage | AnswerMessage
+export type PluginMessage = StateMessage | AnswerMessage | AskMessage
 
 /** One end of a channel: the messages that come in, and a way to send. `send` may run in `runSync`. */
 export type Channel<In, Out> = { readonly messages: Stream.Stream<In>; readonly send: (message: Out) => Effect.Effect<void> }
@@ -64,7 +67,9 @@ export const servePlugin = (ui: UiState["Service"], channel: Channel<HostMessage
       Stream.runForEach((message) =>
         message._tag === "resync"
           ? Effect.flatMap(ui.full, channel.send)
-          : Effect.flatMap(ui.run(message.id, message.action, message.args.map((arg) => (arg === null ? undefined : arg))), (accepted) =>
+          : message._tag === "reply"
+            ? ui.reply(message.n, message.answer)
+            : Effect.flatMap(ui.run(message.id, message.action, message.args.map((arg) => (arg === null ? undefined : arg))), (accepted) =>
               channel.send({ _tag: "answer", n: message.n, accepted }))),
       Effect.forkScoped({ startImmediately: true })
     )
@@ -77,6 +82,9 @@ export type Host = {
   /** Sends an action, and gives true at once: the widget shows the change already, and a refusal comes later in `refused`. */
   readonly act: (id: string, action: string, args: ReadonlyArray<unknown>) => Effect.Effect<boolean>
   readonly refused: Stream.Stream<string>
+  /** The questions of the plugin to the user; answer each one that waits with `reply`. */
+  readonly asks: Stream.Stream<AskMessage>
+  readonly reply: (n: number, answer: boolean) => Effect.Effect<void>
 }
 
 export const connectHost = (channel: Channel<PluginMessage, HostMessage>): Effect.Effect<Host, never, Scope.Scope> =>
@@ -85,6 +93,7 @@ export const connectHost = (channel: Channel<PluginMessage, HostMessage>): Effec
     const mirror = yield* Ref.make<Mirror | undefined>(undefined)
     const sent = new Map<number, string>()
     const refused = yield* Effect.acquireRelease(PubSub.unbounded<string>(), PubSub.shutdown)
+    const asks = yield* Effect.acquireRelease(PubSub.unbounded<AskMessage>(), PubSub.shutdown)
     let n = 0
     yield* channel.messages.pipe(
       Stream.runForEach((message) =>
@@ -95,6 +104,7 @@ export const connectHost = (channel: Channel<PluginMessage, HostMessage>): Effec
             if (!message.accepted && id !== undefined) yield* PubSub.publish(refused, id)
             return
           }
+          if (message._tag === "ask") return yield* PubSub.publish(asks, message)
           const next = receive(yield* Ref.get(mirror), message)
           if (next === "resync") return yield* channel.send({ _tag: "resync" })
           yield* Ref.set(mirror, next)
@@ -105,6 +115,8 @@ export const connectHost = (channel: Channel<PluginMessage, HostMessage>): Effec
     return {
       document,
       refused: Stream.fromPubSub(refused),
+      asks: Stream.fromPubSub(asks),
+      reply: (n, answer) => channel.send({ _tag: "reply", n, answer }),
       act: (id, action, args) =>
         Effect.suspend(() => {
           sent.set(++n, id)

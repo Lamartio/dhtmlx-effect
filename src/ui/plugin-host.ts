@@ -20,6 +20,8 @@ import { diagram, diagramEditor } from "./diagram"
 import { richtext } from "./richtext"
 import { booking } from "./booking"
 import { filePicker } from "./filepicker"
+import { Dialogs, layerDialogsLive } from "./dialogs"
+import type { AskMessage } from "../model/ui-state"
 import { vault } from "./vault"
 import { MAX_FILE_BYTES } from "../model/files"
 import { pivot } from "./pivot"
@@ -485,4 +487,38 @@ export const renderPlugin = (page: PluginHost): Widget =>
     host.style.minHeight = "0"
     host.style.overflow = "hidden"
     yield* keyed(roots, (node) => node.id, (node) => nodePart(page, node, "column"))
+    yield* page.asks.pipe(
+      Stream.runForEach((ask) => Effect.forkScoped(answer(page, ask).pipe(Effect.provide(layerDialogsLive), reporting("A question of the plugin")))),
+      Effect.forkScoped
+    )
+  })
+
+/** Text of the plugin, shown as text: a dialog of DHTMLX takes HTML. */
+const plain = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`)
+
+/** Shows a question of the plugin with the dialogs of the page, and sends the answer back. */
+const answer = (page: PluginHost, ask: AskMessage) =>
+  Effect.gen(function* () {
+    const dialogs = yield* Dialogs
+    const options = ask.options
+    const header = options["header"] === undefined ? {} : { header: plain(options["header"]) }
+    const buttons = options["buttons"]
+    if (ask.kind === "confirm") {
+      const yes = yield* dialogs.confirm({
+        text: plain(options["text"]),
+        ...header,
+        ...(Array.isArray(buttons) && buttons.length === 2 ? { buttons: [plain(buttons[0]), plain(buttons[1])] as const } : {})
+      })
+      return yield* page.reply(ask.n, yes)
+    }
+    if (ask.kind === "alert") {
+      yield* dialogs.alert({ text: plain(options["text"]), ...header, ...(options["button"] === undefined ? {} : { button: plain(options["button"]) }) })
+      return yield* page.reply(ask.n, true)
+    }
+    const kind = options["kind"]
+    yield* dialogs.message({
+      text: plain(options["text"]),
+      ...(typeof options["expire"] === "number" ? { expire: options["expire"] } : {}),
+      ...(kind === "success" || kind === "danger" || kind === "info" ? { kind } : {})
+    })
   })

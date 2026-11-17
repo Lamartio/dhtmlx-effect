@@ -1,6 +1,6 @@
 import { it } from "@effect/vitest"
 import { awaitRedraw } from "dhx-suite"
-import { Effect, Stream, SubscriptionRef } from "effect"
+import { Effect, Fiber, Stream, SubscriptionRef } from "effect"
 import { expect } from "vitest"
 import "dhx-suite/codebase/suite.min.css"
 import "@dhtmlx/kanban/dist/kanban.css"
@@ -455,4 +455,27 @@ it.live("sends a file of a vault and of a file picker to the plugin with its byt
       expect(element.textContent).not.toContain("big.txt")
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+  }))
+
+it.live("shows a confirm of the plugin in the page as text, and gives the click of the user to the plugin", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.height = "200px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const ui = yield* uiState
+      yield* bindTree(Column.make({ id: "main", children: [] })).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, pluginEnd)
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      const answer = yield* ui.ask("confirm", { text: "<b>Delete</b> the note?", buttons: ["Delete", "Keep"] }).pipe(Effect.forkScoped)
+      yield* settle
+      const dialog = document.querySelector<HTMLElement>(".dhx_alert")!
+      expect(dialog.textContent).toContain("<b>Delete</b> the note?")
+      expect(dialog.querySelector("b")).toBe(null)
+      ;[...dialog.querySelectorAll("button")].find((button) => button.textContent?.includes("Delete"))!.click()
+      expect(yield* Fiber.join(answer)).toBe(true)
+    }))
   }))
