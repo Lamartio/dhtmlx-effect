@@ -19,6 +19,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./headless": "./src/headless.ts",
     "./suite": "./src/suite.ts",
     "./gantt": "./src/gantt.ts",
     "./scheduler": "./src/scheduler.ts",
