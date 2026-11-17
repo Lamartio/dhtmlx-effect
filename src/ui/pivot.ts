@@ -4,20 +4,9 @@ import { Browser, follow } from "./browser"
 import { Host, resource } from "./host"
 import { reportedCallback } from "./problems"
 import { wxClear, wxLanguage, wxTheme } from "./wx"
+import type { PivotConfig, PivotField } from "../model/pivot"
 
-/** One field of the rows: its id is the key in a row. */
-export type PivotField = { readonly id: string; readonly label?: string; readonly type: "number" | "text" | "date" }
-
-/** A value of the table: a field and how it is summed up, such as `sum`, `count`, `min`, `max` or `average`. */
-export type PivotValue = { readonly field: string; readonly method: string }
-
-/** How the table is built: the fields of the rows, the fields of the columns, and the values in the cells. */
-export type PivotConfig = {
-  readonly rows?: ReadonlyArray<string>
-  readonly columns?: ReadonlyArray<string>
-  readonly values?: ReadonlyArray<PivotValue>
-  readonly filters?: Readonly<Record<string, unknown>>
-}
+export type { PivotConfig, PivotField, PivotValue } from "../model/pivot"
 
 export type PivotOptions = {
   /** The rows of data. The table follows each change. */

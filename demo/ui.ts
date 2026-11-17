@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Button, Chart, Column, Combobox, DatePicker, Diagram, Form, Grid, Kanban, Layout, RichText, Sidebar, Slider, Tabbar, Todo, Toolbar } from "../src/plugin"
+import { Booking, Button, Chart, Column, Combobox, DatePicker, Diagram, Form, Grid, Kanban, Layout, Pivot, RichText, Sidebar, Slider, Spreadsheet, Tabbar, Todo, Toolbar } from "../src/plugin"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },
@@ -91,6 +91,26 @@ export default Layout.make({
               children: [
                 RichText.make({ id: "notes", format: "markdown", value: "# Notes\n\nWhat we learned this week." }),
                 Todo.make({ id: "tasks", size: 300, data: { tasks: [{ id: "t1", text: "Write the notes" }, { id: "t2", text: "Read them again", parent: "t1" }] } })
+              ]
+            })
+          },
+          {
+            label: "Office",
+            icon: "dxi dxi-tune",
+            child: Tabbar.make({
+              id: "office",
+              tabs: [
+                { label: "Rooms", child: Booking.make({ id: "rooms", cards: [{ id: "blue", title: "Blue room", slots: [{ from: 9, to: 17 }] }, { id: "red", title: "Red room", slots: [{ from: 10, to: 12 }] }] }) },
+                {
+                  label: "Hours",
+                  child: Pivot.make({
+                    id: "hours",
+                    fields: [{ id: "team", label: "Team", type: "text" }, { id: "month", label: "Month", type: "text" }, { id: "hours", label: "Hours", type: "number" }],
+                    rows: [{ id: "1", team: "North", month: "Oct", hours: 5 }, { id: "2", team: "South", month: "Oct", hours: 7 }, { id: "3", team: "North", month: "Nov", hours: 4 }],
+                    config: { rows: ["team"], columns: ["month"], values: [{ field: "hours", method: "sum" }] }
+                  })
+                },
+                { label: "Sheet", child: Spreadsheet.make({ id: "sheet", data: [{ cell: "A1", value: "Apples" }, { cell: "B1", value: 3 }, { cell: "B2", value: "=B1*2" }] }) }
               ]
             })
           },

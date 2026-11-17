@@ -2,7 +2,7 @@ import { Effect, Match, Option, Schema, type Scope, Stream, SubscriptionRef } fr
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTodo, remoteTree, remoteValue } from "../model/remote"
+import { type Host as PluginHost, remoteBooking, remotePivot, remoteSpreadsheet, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTodo, remoteTree, remoteValue } from "../model/remote"
 import { STATES } from "../model/states"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
@@ -18,6 +18,9 @@ import { chart } from "./chart"
 import { datepicker } from "./datepicker"
 import { diagram, diagramEditor } from "./diagram"
 import { richtext } from "./richtext"
+import { booking } from "./booking"
+import { pivot } from "./pivot"
+import { spreadsheet } from "./spreadsheet"
 import { todo } from "./todo"
 import { renderForm } from "./form"
 import { layout } from "./layout"
@@ -113,6 +116,24 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
         Effect.gen(function* () {
           const model = yield* remoteTodo(page, node.id)
           return yield* todo({ data: yield* bridge(model.data, model.edit), ...(node.readonly === undefined ? {} : { readonly: node.readonly }) })
+        }),
+      booking: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteBooking(page, node.id)
+          const made = yield* booking({ cards: model.cards, ...(node.start === undefined ? {} : { start: new Date(node.start) }), ...(node.end === undefined ? {} : { end: new Date(node.end) }) })
+          yield* made.confirmed.pipe(Stream.runForEach((slot) => model.book(slot.card, slot.start.getTime(), slot.minutes, slot.form)), reporting(`The booking ${node.id}`), Effect.forkScoped)
+          return made
+        }),
+      pivot: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remotePivot(page, node.id)
+          return yield* pivot({ rows: model.rows, fields: node.fields, config: yield* bridge(model.config, model.configure), ...(node.configPanel === undefined ? {} : { configPanel: node.configPanel }) })
+        }),
+      spreadsheet: (node) =>
+        Effect.gen(function* () {
+          const model = yield* remoteSpreadsheet(page, node.id)
+          const { _tag, id: _id, size: _size, ...options } = node
+          return yield* spreadsheet({ ...(options as object), data: yield* bridge(model.data, model.edit) })
         }),
       chart: (node) =>
         Effect.gen(function* () {

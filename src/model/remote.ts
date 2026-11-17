@@ -4,6 +4,9 @@ import { STATES } from "./states"
 import type { Row } from "../core/rows"
 import { CHART_ACTIONS, type ChartModel } from "./chart"
 import { CLICK_ACTIONS, type ClickModel } from "./clicks"
+import { BOOKING_ACTIONS, type BookingCard, type BookingModel } from "./booking"
+import { PIVOT_ACTIONS, type PivotConfig, type PivotModel } from "./pivot"
+import { SPREADSHEET_ACTIONS, type SpreadsheetData, type SpreadsheetModel } from "./spreadsheet"
 import { TODO_ACTIONS, type TodoData, type TodoModel } from "./todo"
 import { DIAGRAM_ACTIONS, type DiagramModel, type Item } from "./diagram"
 import { FORM_ACTIONS, type FormModel } from "./form"
@@ -237,3 +240,15 @@ export const remoteDiagram = (host: Host, id: string) =>
 /** The remote model of a To Do List. */
 export const remoteTodo = (host: Host, id: string) =>
   Effect.map(remoteModel(host, id, { data: { tasks: [] } as TodoData }, TODO_ACTIONS, STATES.todo), (model) => model as unknown as TodoModel)
+
+/** The remote model of a Booking: its cards; `confirmed` stays in the plugin. */
+export const remoteBooking = (host: Host, id: string) =>
+  Effect.map(remoteModel(host, id, { cards: [] as ReadonlyArray<BookingCard> }, BOOKING_ACTIONS, STATES.booking), (model) => ({ ...model, confirmed: Stream.empty }) as unknown as BookingModel)
+
+/** The remote model of a Pivot: its rows and its build. */
+export const remotePivot = (host: Host, id: string) =>
+  Effect.map(remoteModel(host, id, { rows: [] as ReadonlyArray<Readonly<Record<string, unknown>>>, config: {} as PivotConfig }, PIVOT_ACTIONS, STATES.pivot), (model) => model as unknown as PivotModel)
+
+/** The remote model of a Spreadsheet: its cells. */
+export const remoteSpreadsheet = (host: Host, id: string) =>
+  Effect.map(remoteModel(host, id, { data: [] as SpreadsheetData }, SPREADSHEET_ACTIONS, STATES.spreadsheet), (model) => model as unknown as SpreadsheetModel)

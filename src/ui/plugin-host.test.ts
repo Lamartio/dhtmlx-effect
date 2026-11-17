@@ -7,6 +7,9 @@ import "@dhtmlx/kanban/dist/kanban.css"
 import "@dhtmlx/diagram/codebase/diagram.min.css"
 import "@dhtmlx/richtext/dist/richtext.css"
 import "@dhtmlx/todolist/dist/todo.css"
+import "@dhtmlx/booking/dist/booking.css"
+import "@dhtmlx/pivot/dist/pivot.css"
+import "@dhtmlx/spreadsheet/codebase/spreadsheet.min.css"
 import "../styles.css"
 import { gridModel } from "../model/grid"
 import { sliderModel } from "../model/inputs"
@@ -14,7 +17,7 @@ import { kanbanModel } from "../model/kanban"
 import { connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
 import { column, gridNode, kanbanNode, publishTree, sliderNode, type UiNode } from "../model/tree"
 import { UiState, uiState } from "../model/ui-state"
-import { bindTree, Button, Chart, Column, Diagram, Form, RichText, Todo, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
+import { bindTree, Booking, Button, Chart, Column, Diagram, Form, Pivot, RichText, Spreadsheet, Todo, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
 import { Browser, browserWith } from "./browser"
 import { alive, Host } from "./host"
 import { renderPlugin } from "./plugin-host"
@@ -356,6 +359,46 @@ it.live("draws a rich text and a to do list of a plugin, and a change in the plu
       expect(element.textContent).toContain("Other notes")
       expect(element.textContent).toContain("Ship it")
       expect(element.textContent).not.toContain("Plan the week")
+    }))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
+  }))
+
+it.live("draws a booking, a pivot and a spreadsheet of a plugin, and a change in the plugin shows in the page", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.width = "1000px"
+    element.style.height = "1200px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const ui = yield* uiState
+      yield* bindTree(Column.make({
+        id: "main",
+        children: [
+          Booking.make({ id: "rooms", size: 400, cards: [{ id: "blue", title: "Blue room", slots: [{ from: 9, to: 17 }] }] }),
+          Pivot.make({
+            id: "hours",
+            size: 400,
+            fields: [{ id: "team", type: "text" }, { id: "hours", type: "number" }],
+            rows: [{ id: "1", team: "North", hours: 5 }, { id: "2", team: "South", hours: 7 }],
+            config: { rows: ["team"], values: [{ field: "hours", method: "sum" }] }
+          }),
+          Spreadsheet.make({ id: "sheet", data: [{ cell: "A1", value: "Apples" }] })
+        ]
+      })).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      yield* servePlugin(ui, pluginEnd)
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      yield* settle
+      expect(element.textContent).toContain("Blue room")
+      expect(element.textContent).toContain("North")
+      expect(element.textContent).toContain("Apples")
+      expect(yield* ui.run("rooms", "book", ["red", 0, 30, {}])).toBe(false)
+      expect(yield* ui.run("hours", "configure", [{ rows: ["nothing"] }])).toBe(false)
+      expect(yield* ui.run("sheet", "edit", [[{ cell: "A1", value: "Plums" }]])).toBe(true)
+      yield* settle
+      expect(element.textContent).toContain("Plums")
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))

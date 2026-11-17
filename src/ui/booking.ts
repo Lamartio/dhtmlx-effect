@@ -4,28 +4,9 @@ import { Browser, follow } from "./browser"
 import { Host, resource } from "./host"
 import { reportedCallback } from "./problems"
 import { wxClear, wxLanguage, wxTheme } from "./wx"
+import type { BookingCard } from "../model/booking"
 
-/** When a card has time slots: from and to as `HH:mm` or a number of hours, on these days of the week (0 is Sunday). */
-export type BookingRule = { readonly from: number | string; readonly to: number | string; readonly size?: number; readonly gap?: number; readonly days?: ReadonlyArray<number>; readonly dates?: ReadonlyArray<number> }
-
-/** One thing to book, such as a person or a room, with the rules for its free slots. */
-export type BookingCard = {
-  readonly id: string
-  readonly title: string
-  readonly category?: string
-  readonly subtitle?: string
-  readonly details?: string
-  readonly preview?: string
-  readonly price?: string
-  /** The stars (0 to 5) and the number of reviews. The cards show reviews only when each card has one. */
-  readonly review?: { readonly stars: number; readonly count: number }
-  readonly slots?: ReadonlyArray<BookingRule>
-  /** The starts of the slots that are taken, as timestamps. */
-  readonly usedSlots?: ReadonlyArray<number>
-  /** Minutes. */
-  readonly slotSize?: number
-  readonly slotGap?: number
-}
+export type { BookingCard, BookingRule } from "../model/booking"
 
 /** A slot that a person booked: the card, the start of the slot and its length in minutes, and what they wrote in the form. */
 export type BookingConfirmed = { readonly card: string; readonly start: Date; readonly minutes: number; readonly form: Readonly<Record<string, string>> }

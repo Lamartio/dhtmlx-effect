@@ -2,6 +2,9 @@ import { Schema } from "effect"
 import { DiagramItemSchema } from "./diagram"
 import { ZOOM_LEVELS } from "./gantt"
 import { TodoDataSchema } from "./todo"
+import { BookingCardSchema } from "./booking"
+import { PivotConfigSchema } from "./pivot"
+import { SpreadsheetDataSchema } from "./spreadsheet"
 
 /**
  * The state of each kind of node, as it is in the document: the Schema that the page checks after
@@ -50,6 +53,9 @@ export const STATES = {
   diagram: Schema.Struct({ items: Schema.Array(DiagramItemSchema), selected }),
   richtext: value(Schema.String),
   todo: Schema.Struct({ data: TodoDataSchema }),
+  booking: Schema.Struct({ cards: Schema.Array(BookingCardSchema) }),
+  pivot: Schema.Struct({ rows: Rows, config: PivotConfigSchema }),
+  spreadsheet: Schema.Struct({ data: SpreadsheetDataSchema }),
   toolbar: none,
   button: none,
   menu: none,

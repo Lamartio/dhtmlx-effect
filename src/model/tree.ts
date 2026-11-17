@@ -1,5 +1,6 @@
 import { Effect, Schema, type Scope, Stream, SubscriptionRef } from "effect"
 import { CHART_ACTIONS, ChartConfigSchema, type ChartModel } from "./chart"
+import { PivotFieldSchema } from "./pivot"
 import { DIAGRAM_ACTIONS, type DiagramModel } from "./diagram"
 import { CLICK_ACTIONS, type ClickModel, type MenuItem, MenuItemSchema, ToolbarItemSchema } from "./clicks"
 import { FieldSchema, FORM_ACTIONS, type FormModel } from "./form"
@@ -90,6 +91,21 @@ export const WireNodes = {
   }),
   /** A To Do List: its tasks, projects and people as the state of its model. */
   todo: Schema.TaggedStruct("todo", { id: Schema.String, size: Size, readonly: Schema.optional(Schema.Boolean) }),
+  /** A Booking: the first and the last day as ISO dates; its cards are the state of its model. */
+  booking: Schema.TaggedStruct("booking", { id: Schema.String, size: Size, start: Schema.optional(Schema.String), end: Schema.optional(Schema.String) }),
+  /** A Pivot: its fields and its panel as config; its rows and its build are the state of its model. */
+  pivot: Schema.TaggedStruct("pivot", { id: Schema.String, size: Size, fields: Schema.Array(PivotFieldSchema), configPanel: Schema.optional(Schema.Boolean) }),
+  /** A Spreadsheet: its size and its bars as config; its cells are the state of its model. */
+  spreadsheet: Schema.TaggedStruct("spreadsheet", {
+    id: Schema.String,
+    size: Size,
+    rowsCount: Schema.optional(Schema.Number),
+    colsCount: Schema.optional(Schema.Number),
+    editLine: Schema.optional(Schema.Boolean),
+    menu: Schema.optional(Schema.Boolean),
+    readonly: Schema.optional(Schema.Boolean),
+    multiSheets: Schema.optional(Schema.Boolean)
+  }),
   menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, items: Schema.Array(MenuItemSchema) }),
   ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */

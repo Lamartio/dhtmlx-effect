@@ -3,14 +3,9 @@ import { Effect, Scope, SubscriptionRef } from "effect"
 import { Browser, follow } from "./browser"
 import { Host, resource } from "./host"
 import { reportedCallback } from "./problems"
+import type { SpreadsheetData } from "../model/spreadsheet"
 
-/** One cell: its name, such as `B2`, and its value. A value that starts with `=` is a formula. */
-export type SpreadsheetCell = { readonly cell: string; readonly value?: string | number; readonly css?: string; readonly format?: string; readonly [key: string]: unknown }
-
-/** The cells of one sheet, or what DHTMLX gives when it has styles or more sheets. */
-export type SpreadsheetData =
-  | ReadonlyArray<SpreadsheetCell>
-  | { readonly data?: ReadonlyArray<SpreadsheetCell>; readonly styles?: Readonly<Record<string, unknown>>; readonly sheets?: ReadonlyArray<unknown>; readonly [key: string]: unknown }
+export type { SpreadsheetCell, SpreadsheetData } from "../model/spreadsheet"
 
 export type SpreadsheetOptions = {
   /** The cells, both ways: an edit of the user goes in, and a new value from the code shows in the sheet. */

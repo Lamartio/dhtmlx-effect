@@ -6,7 +6,7 @@ export * from "./protocol"
 export { renderPlugin } from "./ui/plugin-host"
 export {
   connectHost, type Host as Page, memoryChannel, remoteChart, remoteClicks, remoteDiagram, remoteForm, remoteGantt, remoteGrid, remoteKanban, remoteModel, remoteScheduler,
-  remoteSelection, remoteTodo, remoteTree, remoteValue
+  remoteSelection, remoteTodo, remoteBooking, remotePivot, remoteSpreadsheet, remoteTree, remoteValue
 } from "./model/remote"
 export { openPlugin, portChannel } from "./model/transport"
 export { layerBrowserLive } from "./ui/browser"

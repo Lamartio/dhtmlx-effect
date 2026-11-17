@@ -7,6 +7,9 @@ import { formModel, rulesCheck } from "./form"
 import { ganttModel } from "./gantt"
 import { gridModel } from "./grid"
 import { calendarModel, colorpickerModel, comboboxModel, sliderModel, timepickerModel, VALUE_ACTIONS, valueModel } from "./inputs"
+import { BOOKING_ACTIONS, BookingCardSchema, bookingModel } from "./booking"
+import { PIVOT_ACTIONS, type PivotConfig, PivotConfigSchema, pivotModel } from "./pivot"
+import { SPREADSHEET_ACTIONS, SpreadsheetDataSchema, spreadsheetModel } from "./spreadsheet"
 import { TODO_ACTIONS, TodoDataSchema, todoModel } from "./todo"
 import { kanbanModel } from "./kanban"
 import { type Input, input, stableJson } from "./model"
@@ -49,6 +52,12 @@ export const Chart = WireNodes.chart.mapFields((fields) => ({ ...fields, rows: R
 export const RichText = WireNodes.richtext.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
 /** A To Do List: its tasks, projects and people as data. */
 export const Todo = WireNodes.todo.mapFields((fields) => ({ ...fields, data: TodoDataSchema }))
+/** A Booking: its cards as data. */
+export const Booking = WireNodes.booking.mapFields((fields) => ({ ...fields, cards: Schema.Array(BookingCardSchema) }))
+/** A Pivot: its rows and its build as data. */
+export const Pivot = WireNodes.pivot.mapFields((fields) => ({ ...fields, rows: Rows, config: Schema.optional(PivotConfigSchema) }))
+/** A Spreadsheet: its cells as data. */
+export const Spreadsheet = WireNodes.spreadsheet.mapFields((fields) => ({ ...fields, data: SpreadsheetDataSchema }))
 /** A Diagram: its kind and config, and its items as data. */
 export const Diagram = WireNodes.diagram.mapFields((fields) => ({ ...fields, items: Schema.Array(DiagramItemSchema) }))
 export const DatePicker = WireNodes.datepicker.mapFields((fields) => ({ ...fields, value: Schema.optional(Schema.String) }))
@@ -58,7 +67,7 @@ export const Button = WireNodes.button
 export const Menu = WireNodes.menu
 export const Ribbon = WireNodes.ribbon
 
-const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker, Chart, Diagram, RichText, Todo] as const
+const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon, Form, DatePicker, Chart, Diagram, RichText, Todo, Booking, Pivot, Spreadsheet] as const
 type Widget = (typeof Widgets)[number]["Type"]
 
 /** A frame of the composed UI, with composed children. */
@@ -171,7 +180,7 @@ export const Tabbar = {
 /** The composed Schema of each kind of widget, by its `_tag`. */
 const COMPOSED = {
   calendar: Calendar, timepicker: Timepicker, slider: Slider, colorpicker: Colorpicker, combobox: Combobox, grid: Grid, list: List, dataview: DataView, tree: Tree,
-  gantt: Gantt, scheduler: Scheduler, kanban: Kanban, toolbar: Toolbar, button: Button, menu: Menu, ribbon: Ribbon, form: Form, datepicker: DatePicker, chart: Chart, diagram: Diagram, richtext: RichText, todo: Todo
+  gantt: Gantt, scheduler: Scheduler, kanban: Kanban, toolbar: Toolbar, button: Button, menu: Menu, ribbon: Ribbon, form: Form, datepicker: DatePicker, chart: Chart, diagram: Diagram, richtext: RichText, todo: Todo, booking: Booking, pivot: Pivot, spreadsheet: Spreadsheet
 } as const satisfies { readonly [K in Widget["_tag"]]: { readonly fields: object } }
 
 /** The fields of a kind that are data, not config: the fields of its composed Schema that its wire Schema has not. */
@@ -224,6 +233,13 @@ const modelOf = (node: Widget, data: SubscriptionRef.SubscriptionRef<any>, wire:
     diagram: () => Effect.flatMap(diagramModel({ items: data }), (model) => diagramNode(wire as never, model)),
     richtext: () => Effect.flatMap(valueModel({ value: data }, ""), (model) => modelNode(wire as never, partOf(model, VALUE_ACTIONS))),
     todo: () => Effect.flatMap(todoModel({ data }), (model) => modelNode(wire as never, partOf(model, TODO_ACTIONS))),
+    booking: () => Effect.flatMap(bookingModel({ cards: data }), (model) => modelNode(wire as never, partOf(model, BOOKING_ACTIONS))),
+    pivot: (node) =>
+      Effect.gen(function* () {
+        const model = yield* pivotModel(node.fields, { rows: yield* part<ReadonlyArray<Readonly<Record<string, unknown>>>>("rows", []), config: yield* part<PivotConfig>("config", {}) })
+        return yield* modelNode(wire as never, partOf(model, PIVOT_ACTIONS))
+      }),
+    spreadsheet: () => Effect.flatMap(spreadsheetModel({ data }), (model) => modelNode(wire as never, partOf(model, SPREADSHEET_ACTIONS))),
     datepicker: () => Effect.flatMap(calendarModel({ value: data }), (model) => datepickerNode(wire as never, model)),
     chart: (node) =>
       Effect.gen(function* () {
