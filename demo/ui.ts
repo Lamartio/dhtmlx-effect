@@ -3,7 +3,7 @@
  * dhtmlx-effect. `.make` checks each node. Change it and save: the sender loads it again, and the
  * page changes only what changed.
  */
-import { Column, Combobox, Grid, Kanban, Layout, Sidebar, Slider, Tabbar } from "../src/model/nodes"
+import { Button, Column, Combobox, Grid, Kanban, Layout, Sidebar, Slider, Tabbar, Toolbar } from "../src/model/nodes"
 
 const issues = [
   { id: "156", title: "Headless models", status: "done" },
@@ -20,7 +20,9 @@ const grid = Grid.make({
     { id: "title", header: "Title", filter: "input" },
     { id: "status", header: "Status", filter: "select" }
   ],
-  rows: issues
+  rows: issues,
+  // A right click on a row.
+  menu: [{ id: "open", label: "Open" }, { separator: true }, { id: "close", label: "Close the issue" }]
 })
 
 const board = Kanban.make({
@@ -59,8 +61,10 @@ export default Layout.make({
       child: Column.make({
         id: "settings",
         children: [
+          Toolbar.make({ id: "bar", size: 56, items: [{ title: "Settings" }, { spacer: true }, { id: "reset", label: "Reset", view: "link" }] }),
           Slider.make({ id: "points", label: "Points", min: 0, max: 13, value: 5, size: 90 }),
-          Combobox.make({ id: "status", label: "Status", value: "todo", options: [{ value: "todo", label: "To do" }, { value: "doing", label: "Doing" }, { value: "done", label: "Done" }], size: 90 })
+          Combobox.make({ id: "status", label: "Status", value: "todo", options: [{ value: "todo", label: "To do" }, { value: "doing", label: "Doing" }, { value: "done", label: "Done" }], size: 90 }),
+          Button.make({ id: "save", label: "Save", color: "primary", size: 56 })
         ]
       })
     }

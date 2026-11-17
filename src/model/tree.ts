@@ -1,4 +1,5 @@
 import { Effect, Schema, type Scope, Stream, SubscriptionRef } from "effect"
+import { CLICK_ACTIONS, type ClickModel, type MenuItem, MenuItemSchema, ToolbarItemSchema } from "./clicks"
 import { GANTT_ACTIONS, type GanttModel } from "./gantt"
 import { GRID_ACTIONS, type GridColumn, type GridModel } from "./grid"
 import { VALUE_ACTIONS, type ValueModel, valueModel } from "./inputs"
@@ -51,7 +52,19 @@ export const WireNodes = {
   slider: Schema.TaggedStruct("slider", { id: Schema.String, size: Size, min: Schema.optional(Schema.Number), max: Schema.optional(Schema.Number), step: Schema.optional(Schema.Number), label: Schema.optional(Schema.String) }),
   colorpicker: Schema.TaggedStruct("colorpicker", { id: Schema.String, size: Size }),
   combobox: Schema.TaggedStruct("combobox", { id: Schema.String, size: Size, options: Schema.Array(Schema.Struct({ value: Schema.String, label: Schema.String })), label: Schema.optional(Schema.String), placeholder: Schema.optional(Schema.String) }),
-  grid: Schema.TaggedStruct("grid", { id: Schema.String, size: Size, columns: Schema.Array(GridColumnSchema) }),
+  /** A Grid; `menu` is the context menu of a row (a right click, or the Menu key). */
+  grid: Schema.TaggedStruct("grid", { id: Schema.String, size: Size, columns: Schema.Array(GridColumnSchema), menu: Schema.optional(Schema.Array(MenuItemSchema)) }),
+  toolbar: Schema.TaggedStruct("toolbar", { id: Schema.String, size: Size, items: Schema.Array(ToolbarItemSchema) }),
+  button: Schema.TaggedStruct("button", {
+    id: Schema.String,
+    size: Size,
+    label: Schema.String,
+    color: Schema.optional(Schema.Literals(["primary", "secondary", "danger", "success"])),
+    view: Schema.optional(Schema.Literals(["flat", "link"])),
+    disabled: Schema.optional(Schema.Boolean)
+  }),
+  menu: Schema.TaggedStruct("menu", { id: Schema.String, size: Size, items: Schema.Array(MenuItemSchema) }),
+  ribbon: Schema.TaggedStruct("ribbon", { id: Schema.String, size: Size, blocks: Schema.Array(Schema.Struct({ title: Schema.String, items: Schema.Array(MenuItemSchema) })) }),
   /** A List or a DataView shows the `fields` of a row, one after the other, as text. */
   list: Schema.TaggedStruct("list", { id: Schema.String, size: Size, fields: Schema.Array(Schema.String), itemHeight: Schema.optional(Schema.Number) }),
   dataview: Schema.TaggedStruct("dataview", { id: Schema.String, size: Size, fields: Schema.Array(Schema.String), itemsInRow: Schema.optional(Schema.Number) }),
@@ -254,7 +267,7 @@ export const sliderNode = (id: string, model: ValueModel<number>, config: Config
 export const colorpickerNode = (id: string, model: ValueModel<string>, config: Config<Node<"colorpicker">> = {}) => node<Node<"colorpicker">>("colorpicker", id, partOf(model, VALUE_ACTIONS), config)
 export const comboboxNode = (id: string, model: ValueModel<string | undefined>, config: Config<Node<"combobox">>) => node<Node<"combobox">>("combobox", id, partOf(model, VALUE_ACTIONS), config)
 /** A Grid in the page. Its model needs its rows, so the page can draw them. */
-export const gridNode = (id: string, model: GridModel, config: { readonly columns: ReadonlyArray<GridColumn>; readonly size?: number }) => node<Node<"grid">>("grid", id, partOf(model, GRID_ACTIONS), config)
+export const gridNode = (id: string, model: GridModel, config: { readonly columns: ReadonlyArray<GridColumn>; readonly size?: number; readonly menu?: ReadonlyArray<MenuItem> }) => node<Node<"grid">>("grid", id, partOf(model, GRID_ACTIONS), config)
 export const listNode = (id: string, model: SelectionModel, config: Config<Node<"list">>) => node<Node<"list">>("list", id, partOf(model, SELECTION_ACTIONS), config)
 export const dataviewNode = (id: string, model: SelectionModel, config: Config<Node<"dataview">>) => node<Node<"dataview">>("dataview", id, partOf(model, SELECTION_ACTIONS), config)
 export const treeNode = (id: string, model: TreeModel, config: Config<Node<"tree">> = {}) => node<Node<"tree">>("tree", id, partOf(model, TREE_ACTIONS), config)
@@ -272,6 +285,14 @@ export const kanbanNode = <R extends Row>(
     readonly size?: number
   }
 ) => node<Node<"kanban">>("kanban", id, partOf(model as never, KANBAN_ACTIONS as never), config)
+
+/** A Toolbar, a Button, a Menu or a Ribbon in the page, with its model of clicks under `id`. */
+export const clicksNode = <N extends Extract<WidgetNode, { readonly _tag: "toolbar" | "button" | "menu" | "ribbon" }>>(node: N, model: ClickModel) =>
+  Effect.gen(function* () {
+    const ui = yield* UiState
+    yield* ui.register(node.id, partOf(model, CLICK_ACTIONS))
+    return node
+  })
 
 /** Puts the tree in the document for the life of the scope. A new value of `tree` goes to the page as a patch. */
 export const publishTree = (tree: SubscriptionRef.SubscriptionRef<UiNode>): Effect.Effect<void, never, UiState | Scope.Scope> =>

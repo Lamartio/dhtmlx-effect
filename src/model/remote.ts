@@ -1,5 +1,6 @@
 import { Effect, PubSub, Ref, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
+import { CLICK_ACTIONS, type ClickModel } from "./clicks"
 import { type GanttModel, GANTT_ACTIONS, type Task, type Zoom } from "./gantt"
 import { GRID_ACTIONS, type GridModel, type GridSort } from "./grid"
 import { VALUE_ACTIONS, type ValueModel } from "./inputs"
@@ -157,7 +158,7 @@ export const remoteValue = <A>(host: Host, id: string, initial: A) =>
 export const remoteGrid = (host: Host, id: string) =>
   Effect.map(
     remoteModel(host, id, { selected: undefined as string | undefined, sort: undefined as GridSort | undefined, filters: {} as Readonly<Record<string, string>>, rows: [] as ReadonlyArray<Row> }, GRID_ACTIONS),
-    (model) => ({ ...model, edits: Stream.empty }) as unknown as GridModel & { readonly rows: SubscriptionRef.SubscriptionRef<ReadonlyArray<Row>> }
+    (model) => ({ ...model, edits: Stream.empty, chosen: Stream.empty }) as unknown as GridModel & { readonly rows: SubscriptionRef.SubscriptionRef<ReadonlyArray<Row>> }
   )
 
 export const remoteSelection = (host: Host, id: string) =>
@@ -189,3 +190,7 @@ export const remoteKanban = <R extends Row>(host: Host, id: string) =>
     remoteModel(host, id, { selected: undefined as string | undefined, rows: [] as ReadonlyArray<R> }, KANBAN_ACTIONS),
     (model) => ({ ...model, opened: Stream.empty }) as unknown as KanbanModel<R>
   )
+
+/** The remote model of a Toolbar, a Button, a Menu or a Ribbon: only `click`, which goes to the plugin. */
+export const remoteClicks = (host: Host, id: string) =>
+  Effect.map(remoteModel(host, id, {}, CLICK_ACTIONS), (model) => ({ ...model, clicked: Stream.empty }) as unknown as ClickModel)

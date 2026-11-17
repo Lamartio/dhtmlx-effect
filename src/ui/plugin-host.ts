@@ -2,7 +2,7 @@ import { Effect, Option, Schema, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
 import { zoned } from "../core/form"
 import { stableJson } from "../model/model"
-import { type Host as PluginHost, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
+import { type Host as PluginHost, remoteClicks, remoteGantt, remoteModel, remoteGrid, remoteKanban, remoteScheduler, remoteSelection, remoteTree, remoteValue } from "../model/remote"
 import { CELLS_ACTIONS, childrenOf, TREE_KEY, type UiNode, UiNodeSchema } from "../model/tree"
 import { Browser } from "./browser"
 import { dataCollection, escapeHtml, renderDataView, renderGrid, renderList, renderTree, treeCollection } from "./data"
@@ -12,7 +12,10 @@ import { renderCalendar, renderColorpicker, renderCombobox, renderSlider, render
 import { renderKanban } from "./kanban"
 import { reporting } from "./problems"
 import { renderScheduler } from "./scheduler"
+import { button } from "./button"
 import { layout } from "./layout"
+import { gridContextMenu, menu, ribbon } from "./menus"
+import { toolbar, toolbarButton, toolbarSeparator, toolbarSpacer, toolbarTitle } from "./toolbar"
 import { sidebar } from "./sidebar"
 import { tabbar } from "./tabbar"
 
@@ -63,7 +66,53 @@ const widgetOf = (page: PluginHost, node: UiNode, children: SubscriptionRef.Subs
         return yield* renderCombobox(yield* remoteValue<string | undefined>(page, node.id, undefined), node as never)
       case "grid": {
         const model = yield* remoteGrid(page, node.id)
-        return yield* renderGrid(model, { data: yield* dataCollection(model.rows), columns: node.columns as never })
+        const made = yield* renderGrid(model, { data: yield* dataCollection(model.rows), columns: node.columns as never })
+        const menu = node.menu
+        if (menu !== undefined && menu.length > 0) {
+          const choices = yield* gridContextMenu(made.grid, () => menu as never)
+          yield* choices.pipe(Stream.runForEach(({ row, choice }) => model.choose(row, choice)), reporting(`The menu of ${node.id}`), Effect.forkScoped)
+        }
+        return made
+      }
+      case "toolbar": {
+        const model = yield* remoteClicks(page, node.id)
+        return yield* toolbar(Effect.forEach(node.items, (item) =>
+          Effect.gen(function* () {
+            if ("title" in item) return void (yield* toolbarTitle(item.title))
+            if ("spacer" in item) return void (yield* toolbarSpacer)
+            if ("separator" in item) return void (yield* toolbarSeparator)
+            const clicks = yield* toolbarButton({
+              ...(item.label === undefined ? {} : { label: item.label }),
+              ...(item.icon === undefined ? {} : { icon: item.icon }),
+              ...(item.tooltip === undefined ? {} : { tooltip: item.tooltip }),
+              ...(item.color === undefined ? {} : { color: item.color }),
+              ...(item.view === undefined ? {} : { view: item.view })
+            })
+            yield* clicks.pipe(Stream.runForEach(() => model.click(item.id)), reporting(`The toolbar ${node.id}`), Effect.forkScoped)
+          }), { discard: true }))
+      }
+      case "button": {
+        const model = yield* remoteClicks(page, node.id)
+        const made = yield* button({
+          label: node.label,
+          ...(node.color === undefined ? {} : { color: node.color }),
+          ...(node.view === undefined ? {} : { view: node.view }),
+          ...(node.disabled === true ? { disabled: yield* SubscriptionRef.make(true) } : {})
+        })
+        yield* made.clicks.pipe(Stream.runForEach(() => model.click(node.id)), reporting(`The button ${node.id}`), Effect.forkScoped)
+        return made
+      }
+      case "menu": {
+        const model = yield* remoteClicks(page, node.id)
+        const made = yield* menu({ items: node.items as never })
+        yield* made.choices.pipe(Stream.runForEach((id) => model.click(id)), reporting(`The menu ${node.id}`), Effect.forkScoped)
+        return made
+      }
+      case "ribbon": {
+        const model = yield* remoteClicks(page, node.id)
+        const made = yield* ribbon({ blocks: node.blocks as never })
+        yield* made.choices.pipe(Stream.runForEach((id) => model.click(id)), reporting(`The ribbon ${node.id}`), Effect.forkScoped)
+        return made
       }
       case "list": {
         const model = yield* remoteSelection(page, node.id)

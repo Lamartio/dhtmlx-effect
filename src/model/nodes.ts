@@ -1,4 +1,5 @@
 import { Effect, Exit, Schema, Scope, Stream, SubscriptionRef } from "effect"
+import { clickable, clickModel } from "./clicks"
 import { ganttModel } from "./gantt"
 import { gridModel } from "./grid"
 import { calendarModel, colorpickerModel, comboboxModel, sliderModel, timepickerModel } from "./inputs"
@@ -8,7 +9,7 @@ import { schedulerModel } from "./scheduler"
 import { selectionModel, treeModel } from "./selection"
 import {
   calendarNode, colorpickerNode, comboboxNode, dataviewNode, ganttNode, gridNode, kanbanNode, listNode, publishTree, schedulerNode, sliderNode,
-  cellsModel, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
+  cellsModel, clicksNode, type LayoutNode, layoutNode, type SidebarNode, sidebarNode, tabbarNode, type TabbarNode, tabsModel, timepickerNode, treeNode, type UiNode,
   WireNodes
 } from "./tree"
 import type { UiState } from "./ui-state"
@@ -41,8 +42,13 @@ export const Tree = WireNodes.tree.mapFields((fields) => ({ ...fields, rows: Row
 export const Gantt = WireNodes.gantt.mapFields((fields) => ({ ...fields, tasks: Schema.Array(TaskSchema) }))
 export const Scheduler = WireNodes.scheduler.mapFields((fields) => ({ ...fields, events: Schema.Array(EventSchema) }))
 export const Kanban = WireNodes.kanban.mapFields((fields) => ({ ...fields, rows: Rows }))
+/** A Toolbar, a Button, a Menu and a Ribbon have no data: their items are config, and a click goes to the plugin. */
+export const Toolbar = WireNodes.toolbar
+export const Button = WireNodes.button
+export const Menu = WireNodes.menu
+export const Ribbon = WireNodes.ribbon
 
-const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban] as const
+const Widgets = [Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Toolbar, Button, Menu, Ribbon] as const
 type Widget = (typeof Widgets)[number]["Type"]
 
 /** A frame of the composed UI, with composed children. */
@@ -172,7 +178,7 @@ const modelOf = (node: Widget, data: SubscriptionRef.SubscriptionRef<any>, wire:
     case "combobox":
       return Effect.flatMap(comboboxModel({ value: data, options: node.options }), (model) => comboboxNode(node.id, model, config))
     case "grid":
-      return Effect.flatMap(gridModel({ columns: node.columns as never, rows: data }), (model) => gridNode(node.id, model, config))
+      return Effect.flatMap(gridModel({ columns: node.columns as never, rows: data, ...(node.menu === undefined ? {} : { menu: node.menu }) }), (model) => gridNode(node.id, model, config))
     case "list":
       return Effect.flatMap(selectionModel({ rows: data }), (model) => listNode(node.id, model, config))
     case "dataview":
@@ -183,6 +189,13 @@ const modelOf = (node: Widget, data: SubscriptionRef.SubscriptionRef<any>, wire:
       return Effect.flatMap(ganttModel({ tasks: data }), (model) => ganttNode(node.id, model, config))
     case "scheduler":
       return Effect.flatMap(schedulerModel({ events: data }), (model) => schedulerNode(node.id, model, config))
+    case "toolbar":
+    case "menu":
+      return Effect.flatMap(clickModel(clickable(node.items)), (model) => clicksNode(wire as never, model))
+    case "ribbon":
+      return Effect.flatMap(clickModel(clickable(node.blocks.flatMap((block) => block.items))), (model) => clicksNode(wire as never, model))
+    case "button":
+      return Effect.flatMap(clickModel(node.disabled === true ? [] : [node.id]), (model) => clicksNode(wire as never, model))
     case "kanban":
       return Effect.flatMap(kanbanModel({ rows: data, field: node.field as never, columns: node.columns as never, ...(node.lanes === undefined ? {} : { lanes: node.lanes as never }) }), (model) => kanbanNode(node.id, model as never, config))
   }

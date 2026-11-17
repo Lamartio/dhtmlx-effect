@@ -1,5 +1,6 @@
 import { Effect, PubSub, type Scope, Stream, SubscriptionRef } from "effect"
 import type { Row } from "../core/rows"
+import { clickable, type MenuItem } from "./clicks"
 import { changesOf, type Entry, history, type Input, input, recordInput } from "./model"
 import { selectOn } from "./selection"
 
@@ -53,6 +54,10 @@ export type GridModel = {
   readonly filter: (column: string, text: string) => Effect.Effect<boolean>
   /** Changes a cell. A column that is not editable, or a row that is not there, changes nothing. */
   readonly edit: (row: string, column: string, value: unknown) => Effect.Effect<boolean>
+  /** The context menu of a row: the user chose `item` for `row`. An item that is not in `menu`, or a row that is not there, is refused. */
+  readonly choose: (row: string, item: string) => Effect.Effect<boolean>
+  /** Each item of the context menu that the user chose, with its row. */
+  readonly chosen: Stream.Stream<{ readonly row: string; readonly item: string }>
   readonly recent: Effect.Effect<ReadonlyArray<Entry>>
   readonly snapshot: Effect.Effect<GridState>
   /** One `void` on each change of the state: see `changesOf`. */
@@ -60,7 +65,7 @@ export type GridModel = {
 }
 
 /** The actions of a `GridModel`, by name. */
-export const GRID_ACTIONS = ["select", "sortBy", "filter", "edit"] as const satisfies ReadonlyArray<keyof GridModel>
+export const GRID_ACTIONS = ["select", "sortBy", "filter", "edit", "choose"] as const satisfies ReadonlyArray<keyof GridModel>
 
 export type GridModelOptions<R extends { readonly id: string }> = {
   readonly columns: ReadonlyArray<GridColumn>
@@ -69,6 +74,8 @@ export type GridModelOptions<R extends { readonly id: string }> = {
   readonly selected?: Input<string | undefined>
   readonly sort?: Input<GridSort | undefined>
   readonly filters?: Input<Readonly<Record<string, string>>>
+  /** The context menu of a row. */
+  readonly menu?: ReadonlyArray<MenuItem>
   /** How many entries `recent` keeps. Default: 0. */
   readonly history?: number
 }
@@ -83,6 +90,8 @@ export const gridModel = <R extends { readonly id: string }>(options: GridModelO
     const sort = yield* input<GridSort | undefined>(options.sort, undefined)
     const filters = yield* input<Readonly<Record<string, string>>>(options.filters, {})
     const edits = yield* Effect.acquireRelease(PubSub.unbounded<GridEdit>(), PubSub.shutdown)
+    const chosen = yield* Effect.acquireRelease(PubSub.unbounded<{ readonly row: string; readonly item: string }>(), PubSub.shutdown)
+    const items = clickable(options.menu ?? [])
     const log = yield* history(options.history ?? 0)
     yield* recordInput(log, "selected", selected)
     yield* recordInput(log, "sort", sort)
@@ -93,6 +102,15 @@ export const gridModel = <R extends { readonly id: string }>(options: GridModelO
       sort,
       filters,
       edits: Stream.fromPubSub(edits),
+      chosen: Stream.fromPubSub(chosen),
+      choose: (row, item) =>
+        Effect.gen(function* () {
+          if (!items.includes(item) || !(yield* has(row))) return false
+          yield* action("choose", { row, item })
+          yield* PubSub.publish(chosen, { row, item })
+          yield* log.record({ _tag: "event", name: "chosen", value: { row, item } })
+          return true
+        }),
       select: selectOn(log, rows as SubscriptionRef.SubscriptionRef<ReadonlyArray<Row>> | undefined, selected),
       sortBy: (id, dir) =>
         Effect.gen(function* () {

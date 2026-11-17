@@ -1,6 +1,6 @@
 import { it } from "@effect/vitest"
 import { awaitRedraw } from "dhx-suite"
-import { Effect, SubscriptionRef } from "effect"
+import { Effect, Stream, SubscriptionRef } from "effect"
 import { expect } from "vitest"
 import "dhx-suite/codebase/suite.min.css"
 import "@dhtmlx/kanban/dist/kanban.css"
@@ -11,7 +11,7 @@ import { kanbanModel } from "../model/kanban"
 import { connectHost, type HostMessage, memoryChannel, type PluginMessage, servePlugin } from "../model/remote"
 import { column, gridNode, kanbanNode, publishTree, sliderNode, type UiNode } from "../model/tree"
 import { UiState, uiState } from "../model/ui-state"
-import { bindTree, Column, Grid, Kanban, Layout, Sidebar, Slider, Tabbar } from "../model/nodes"
+import { bindTree, Button, Column, Grid, Kanban, Layout, Menu, Sidebar, Slider, Tabbar, Toolbar } from "../model/nodes"
 import { Browser, browserWith } from "./browser"
 import { alive, Host } from "./host"
 import { renderPlugin } from "./plugin-host"
@@ -181,4 +181,37 @@ it.live("draws a sidebar and a layout of a plugin: a click on an item goes to th
     }))
     expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
     expect(element.innerHTML).toBe("")
+  }))
+
+it.live("sends a click on a toolbar, a button and a menu of a plugin to the plugin", () =>
+  Effect.gen(function* () {
+    const element = document.createElement("div")
+    element.style.width = "900px"
+    element.style.height = "400px"
+    document.body.append(element)
+    const browser = yield* browserWith(FACTS)
+    yield* Effect.scoped(Effect.gen(function* () {
+      const [pluginEnd, hostEnd] = yield* memoryChannel<HostMessage, PluginMessage>()
+      const ui = yield* uiState
+      yield* bindTree(Column.make({
+        id: "main",
+        children: [
+          Toolbar.make({ id: "bar", size: 56, items: [{ title: "Plan" }, { separator: true }, { id: "add", label: "Add" }, { spacer: true }, { id: "help", label: "Help" }] }),
+          Button.make({ id: "save", size: 50, label: "Save", color: "primary" }),
+          Menu.make({ id: "menu", size: 50, items: [{ id: "file", label: "File", items: [{ id: "open", label: "Open" }] }, { id: "about", label: "About" }] })
+        ]
+      })).pipe(Effect.provideService(UiState, ui))
+      const page = yield* connectHost(hostEnd)
+      const log: Array<string> = []
+      yield* servePlugin(ui, { ...pluginEnd, messages: pluginEnd.messages.pipe(Stream.tap((message) => Effect.sync(() => message._tag === "action" && void log.push(`${message.id}.${message.action}(${message.args.join(",")})`)))) })
+      yield* renderPlugin(page).pipe(Effect.provideService(Host, element), Effect.provideService(Browser, browser))
+      yield* settle
+      const click = (selector: string, text: string) => [...element.querySelectorAll<HTMLElement>(selector)].find((one) => one.textContent?.trim() === text)!.click()
+      click(".dhx_toolbar-button, button", "Add")
+      click("button", "Save")
+      click(".dhx_menu-button, button", "About")
+      yield* settle
+      expect(log).toEqual(["bar.click(add)", "save.click(save)", "menu.click(about)"])
+    }))
+    expect([...(yield* SubscriptionRef.get(alive))]).toEqual([])
   }))

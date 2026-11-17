@@ -7,9 +7,8 @@ import { Host, resource } from "./host"
  * Menus as data: an item is a plain object, a choice comes back as the id of the item.
  * `items` can be a `SubscriptionRef`, so a menu changes in place, for example to disable an item.
  */
-export type MenuItem =
-  | { readonly id: string; readonly label: string; readonly icon?: string; readonly hotkey?: string; readonly disabled?: boolean; readonly items?: ReadonlyArray<MenuItem> }
-  | { readonly separator: true }
+export type { MenuItem } from "../model/clicks"
+import type { MenuItem } from "../model/clicks"
 
 const toData = (items: ReadonlyArray<MenuItem>): Array<unknown> =>
   items.map((item) =>
