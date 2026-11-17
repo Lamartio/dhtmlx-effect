@@ -189,7 +189,7 @@ it.live("sends a change in the Gantt back to the plan as one task, and not back 
     const facts = yield* browserWith(FACTS)
     yield* Effect.scoped(Effect.gen(function* () {
       const tasks = yield* SubscriptionRef.make(PLAN)
-      const { chart } = yield* gantt({ tasks })
+      const { chart, model } = yield* gantt({ tasks, history: 10 })
       yield* tick
       let updates = 0
       chart.attachEvent("onAfterTaskUpdate", () => void updates++, {})
@@ -199,6 +199,8 @@ it.live("sends a change in the Gantt back to the plan as one task, and not back 
       yield* tick
       expect((yield* SubscriptionRef.get(tasks)).map((one) => one.text)).toEqual(["Design it", "Build"])
       expect(updates).toBe(1)
+      // The change in the Gantt is the action of the model.
+      expect((yield* model.recent).filter((entry) => entry._tag === "action").map((entry) => entry.name)).toEqual(["putTask"])
     }).pipe(Effect.provideService(Host, host), Effect.provideService(Browser, facts)))
   }))
 

@@ -1,20 +1,16 @@
 import type { GanttStatic } from "dhtmlx-gantt"
 import { Effect, Option, Stream, SubscriptionRef } from "effect"
-import {
-  makeChart, makeTodayLine, readTask, RENDER_EVENTS, showDark, showLocale, showPlan, showWidth, type Task, withNewTask, type Zoom, zoomStep
-} from "../core/gantt"
-import { applyPlan, diffPlan, planWith } from "../core/plan-diff"
+import { makeChart, makeTodayLine, readTask, RENDER_EVENTS, showDark, showLocale, showPlan, showWidth } from "../core/gantt"
+import { applyPlan, diffPlan } from "../core/plan-diff"
+import { type GanttModel, ganttModel, type GanttModelOptions } from "../model/gantt"
 import { Browser, follow } from "./browser"
 import { Host, resource } from "./host"
 import { reportedCallback, reporting } from "./problems"
 
 export { ganttLanguage, type Task, type Zoom, ZOOM_LEVELS } from "../core/gantt"
 
-export type GanttOptions = {
-  /** The plan. The Gantt shows each change; a drag in the Gantt writes the plan back. */
-  readonly tasks: SubscriptionRef.SubscriptionRef<ReadonlyArray<Task>>
-  readonly zoom?: SubscriptionRef.SubscriptionRef<Zoom>
-}
+/** The plan (`tasks`): the Gantt shows each change, and a drag in the Gantt writes the plan back. */
+export type GanttOptions = GanttModelOptions
 
 /** A Gantt event for the life of the scope. A throw in `f` is reported, not given to the Gantt. */
 const listen = (chart: GanttStatic, event: string, f: (id: string | number) => void) =>
@@ -27,19 +23,22 @@ const listen = (chart: GanttStatic, event: string, f: (id: string | number) => v
  * A DHTMLX Gantt in the host. It takes what it shows from Effect: the plan from `tasks`, and from
  * `Browser` the skin (dark), the language of the scales, the today line (now and the time zone) and
  * the columns of the grid (the width of the window). Each one changes in place, with no remount.
+ *
+ * The Gantt runs on its model (`ganttModel`): a drag, a resize, a new name, a new task and a delete
+ * in the Gantt are its actions, and the plan and the zoom of the model show in the Gantt.
  */
 export const gantt = (options: GanttOptions) =>
   Effect.gen(function* () {
     const host = yield* Host
     const browser = yield* Browser
-    const zoom = options.zoom ?? (yield* SubscriptionRef.make<Zoom>("day"))
+    const model = yield* ganttModel(options)
     const chart = yield* resource("gantt", () => makeChart(host), (chart) => chart.destructor())
 
     // From the plan to the Gantt, as changes: a scan over the snapshots gives the changes between two
     // of them. The first one is a parse. Only the changed tasks are drawn again, so the selection, the
     // scroll and the open branches stay.
     let applying = false
-    yield* SubscriptionRef.changes(options.tasks).pipe(
+    yield* SubscriptionRef.changes(model.tasks).pipe(
       Stream.zipWithPrevious,
       Stream.runForEach(([before, after]) =>
         Effect.sync(() => {
@@ -56,14 +55,14 @@ export const gantt = (options: GanttOptions) =>
     )
     // From the Gantt to the plan: one task for a drag, a resize or a new name. A change that came from
     // the plan is not sent back.
-    const send = (change: Parameters<typeof planWith>[1]) => {
-      if (!applying) Effect.runSync(SubscriptionRef.update(options.tasks, (tasks) => planWith(tasks, change)))
+    const send = (action: Effect.Effect<void>) => {
+      if (!applying) Effect.runSync(action)
     }
-    yield* listen(chart, "onAfterTaskUpdate", (id) => send({ put: readTask(chart, id) }))
-    yield* listen(chart, "onAfterTaskAdd", (id) => send({ put: readTask(chart, id) }))
-    yield* listen(chart, "onAfterTaskDelete", (id) => send({ remove: String(id) }))
+    yield* listen(chart, "onAfterTaskUpdate", (id) => send(model.putTask(readTask(chart, id))))
+    yield* listen(chart, "onAfterTaskAdd", (id) => send(model.putTask(readTask(chart, id))))
+    yield* listen(chart, "onAfterTaskDelete", (id) => send(model.removeTask(String(id))))
 
-    yield* follow(zoom, (level) => chart.ext.zoom.setLevel(level))
+    yield* follow(model.zoom, (level) => chart.ext.zoom.setLevel(level))
     yield* follow(browser.dark, (dark) => showDark(chart, host, dark))
     yield* follow(browser.locale, (locale) => showLocale(chart, locale))
     yield* follow(browser.viewport, (viewport) => showWidth(chart, viewport.width))
@@ -82,11 +81,11 @@ export const gantt = (options: GanttOptions) =>
 
     return {
       chart,
-      zoom,
-      zoomIn: SubscriptionRef.update(zoom, (level) => zoomStep(level, -1)),
-      zoomOut: SubscriptionRef.update(zoom, (level) => zoomStep(level, 1)),
+      zoom: model.zoom,
+      zoomIn: model.zoomIn,
+      zoomOut: model.zoomOut,
       today: SubscriptionRef.get(browser.now).pipe(Effect.flatMap((now) => Effect.sync(() => chart.showDate(now)))),
-      addTask: (text: string) =>
-        SubscriptionRef.get(browser.now).pipe(Effect.flatMap((now) => SubscriptionRef.update(options.tasks, (tasks) => withNewTask(tasks, text, now))))
+      addTask: (text: string) => SubscriptionRef.get(browser.now).pipe(Effect.flatMap((now) => model.addTask(text, now))),
+      model: model as GanttModel
     }
   })

@@ -1,5 +1,7 @@
 import type { GanttStatic } from "dhtmlx-gantt"
-import { day, type Task } from "./gantt"
+import { day, type Task } from "../model/gantt"
+
+export { planWith } from "../model/gantt"
 
 /**
  * The plan as changes, not as snapshots. DHTMLX keeps its own store and wants each change
@@ -83,11 +85,4 @@ export const applyPlan = (chart: GanttStatic, ops: ReadonlyArray<PlanOp>) => {
       }
     }
   })
-}
-
-/** The plan with one task changed, added or removed by the Gantt. */
-export const planWith = (tasks: ReadonlyArray<Task>, change: { readonly put: Task } | { readonly remove: string }): ReadonlyArray<Task> => {
-  if ("remove" in change) return tasks.filter((task) => task.id !== change.remove && task.parent !== change.remove)
-  const at = tasks.findIndex((task) => task.id === change.put.id)
-  return at === -1 ? [...tasks, change.put] : tasks.map((task, index) => (index === at ? change.put : task))
 }

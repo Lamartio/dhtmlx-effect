@@ -1,22 +1,13 @@
 import { Gantt, type GanttStatic } from "dhtmlx-gantt"
+import { day, type Task } from "../model/gantt"
+
+export { day, type Task, withNewTask, type Zoom, ZOOM_LEVELS, zoomStep } from "../model/gantt"
 
 /**
  * What the Gantt does, with no Effect: plain functions on a `GanttStatic`. The Effect part in
  * `src/ui/gantt.ts` only wires them to streams and scopes, and another wrapper (React, for example)
  * can call the same functions.
  */
-
-/** One task of a plan. Days are `YYYY-MM-DD`. */
-export type Task = {
-  readonly id: string
-  readonly text: string
-  readonly start: string
-  /** Days. */
-  readonly duration: number
-  /** 0 to 1. */
-  readonly progress: number
-  readonly parent?: string
-}
 
 /** The language code of the Gantt for a BCP 47 tag: `nl-NL` gives `nl`, `ja` gives `jp`. English when it has none. */
 export const ganttLanguage = (locale: string): string => {
@@ -26,23 +17,8 @@ export const ganttLanguage = (locale: string): string => {
 }
 const LANGUAGES = new Set("ar be ca cn cs da de el en es fi fr he hr hu id it jp kr nl no pl pt ro ru si sk sv tr ua".split(" "))
 
-/** The zoom levels, from days to months. */
-export const ZOOM_LEVELS = ["day", "week", "month"] as const
-export type Zoom = (typeof ZOOM_LEVELS)[number]
-
-/** One level in, or one level out. */
-export const zoomStep = (level: Zoom, step: -1 | 1): Zoom =>
-  ZOOM_LEVELS[Math.min(ZOOM_LEVELS.length - 1, Math.max(0, ZOOM_LEVELS.indexOf(level) + step))]!
-
 /** Below this width the grid shows only the names of the tasks. */
 export const NARROW = 720
-
-export const day = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-
-let added = 0
-/** The plan with one new task of two days, from now. */
-export const withNewTask = (tasks: ReadonlyArray<Task>, text: string, now: Date): ReadonlyArray<Task> =>
-  [...tasks, { id: `new-${++added}`, text, start: day(now), duration: 2, progress: 0 }]
 
 /** A new Gantt in the host, with our date format and zoom levels. */
 export const makeChart = (host: HTMLElement): GanttStatic => {
