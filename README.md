@@ -42,8 +42,8 @@ The package ships TypeScript source, so use a bundler that reads TypeScript (Vit
 | `dhtmlx-effect/pivot` | `@dhtmlx/pivot` | Pivot table |
 | `dhtmlx-effect/spreadsheet` | `@dhtmlx/spreadsheet` | Spreadsheet |
 | `dhtmlx-effect/vault` | `@dhtmlx/vault` | Vault, the file uploader |
-| `dhtmlx-effect/headless` | `effect` | The models of the widgets, with no DHTMLX: for now Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler and Kanban |
-| `dhtmlx-effect/plugin` | `effect` | The frame of a plugin, with no DHTMLX: the models, the UI composed with Schema, `bindTree`, `servePlugin`, `acceptHost` |
+| `dhtmlx-effect/headless` | `effect` | The models of the widgets, with no DHTMLX: Calendar, Timepicker, Slider, Colorpicker, Combobox, Grid, List, DataView, Tree, Gantt, Scheduler, Kanban, Form, Chart, Diagram, To Do List, Booking, Pivot, Spreadsheet, the Vault and the file picker, and `Dialogs` |
+| `dhtmlx-effect/plugin` | `effect` | The frame of a plugin, with no DHTMLX: the models, the UI composed with Schema, `bindTree`, `servePlugin`, `acceptHost`, and `Dialogs` with `layerDialogsPlugin` |
 | `dhtmlx-effect/host` | `dhx-suite` and the products in the tree | The page of a plugin: `renderPlugin`, the remote models, `connectHost`, `openPlugin` |
 | `dhtmlx-effect/protocol` | `effect` | What both share: the Schemas of the nodes, the states and the messages, the patch |
 | `dhtmlx-effect/plugin-host` | `dhx-suite` and the products in the tree | `renderPlugin`: draws the UI that a plugin in another frame sends |
@@ -152,6 +152,8 @@ A renderer takes a model that was made before: `slider(options)` is `sliderModel
 ### A plugin in another frame
 
 The models can live in a plugin, in an iframe, and the widgets in the page around it. The plugin composes the UI with Effect Schema: `Column.make({ id, children: [Grid.make({ id, columns, rows })] })`, one Schema for each kind of node, with its config and its data. `bindTree` keeps a model for each node by id, and `servePlugin` sends the state and the tree as JSON patches; `Schema.encode(UiSchema)` gives the JSON of a whole tree. The page keeps a copy (`connectHost`) and draws it with `renderPlugin` from `dhtmlx-effect/plugin-host`: a widget on a remote model for each node, in a flex column that fills its host with no scroll. A node can take a few Tailwind classes for spacing and place, such as `classes: ["mx-2"]` or `["absolute", "right-4", "bottom-4"]` for a floating button: only the classes in `src/model/utilities.ts`, and never colors, as the page decides the theme. `styles.css` has their CSS, so the page needs no Tailwind; after a change of the list, run `bun run utilities`. An action of the user goes to the plugin with the id of its node; the plugin answers it, and a refused action draws the old value back. Only what changed is drawn again. `openPlugin` and `acceptHost` join the two frames over one `MessagePort`, and each side checks each message with a Schema.
+
+Each widget node takes a `tooltip`: plain text on hover and focus. A `Window` node holds a child in a DHTMLX Window over the page, and takes no room in its frame: the plugin opens and closes it with the action `open`, and the cross of the user is the action `close`. The page keeps the child while the window is closed. A file that the user picks in a `VaultNode` or a `FilePicker` goes to the plugin with its bytes; the history of the model keeps what the file is, not its bytes. With `layerDialogsPlugin`, `Dialogs` in a plugin asks the page: a confirm or an alert waits for the answer of the user, a message does not wait. Three questions at most wait at one time; one more is answered no at once. The page shows the text of the plugin as text, not as HTML.
 
 ### A widget never stops in silence
 
