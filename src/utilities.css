@@ -1,6 +1,5 @@
 /* Made by scripts/utilities.ts from src/model/utilities.ts: do not change it by hand. */
 /*! tailwindcss v4.3.4 | MIT License | https://tailwindcss.com */
-@layer properties;
 .absolute {
   position: absolute;
 }
@@ -510,76 +509,4 @@
 }
 .pl-8 {
   padding-left: calc(0.25rem * 8);
-}
-.text-center {
-  text-align: center;
-}
-.text-left {
-  text-align: left;
-}
-.text-right {
-  text-align: right;
-}
-.text-2xl {
-  font-size: 1.5rem;
-  line-height: var(--tw-leading, calc(2 / 1.5));
-}
-.text-base {
-  font-size: 1rem;
-  line-height: var(--tw-leading, calc(1.5 / 1));
-}
-.text-lg {
-  font-size: 1.125rem;
-  line-height: var(--tw-leading, calc(1.75 / 1.125));
-}
-.text-sm {
-  font-size: 0.875rem;
-  line-height: var(--tw-leading, calc(1.25 / 0.875));
-}
-.text-xl {
-  font-size: 1.25rem;
-  line-height: var(--tw-leading, calc(1.75 / 1.25));
-}
-.text-xs {
-  font-size: 0.75rem;
-  line-height: var(--tw-leading, calc(1 / 0.75));
-}
-.font-bold {
-  --tw-font-weight: 700;
-  font-weight: 700;
-}
-.font-medium {
-  --tw-font-weight: 500;
-  font-weight: 500;
-}
-.font-normal {
-  --tw-font-weight: 400;
-  font-weight: 400;
-}
-.font-semibold {
-  --tw-font-weight: 600;
-  font-weight: 600;
-}
-.normal-case {
-  text-transform: none;
-}
-.uppercase {
-  text-transform: uppercase;
-}
-.italic {
-  font-style: italic;
-}
-.not-italic {
-  font-style: normal;
-}
-@property --tw-font-weight {
-  syntax: "*";
-  inherits: false;
-}
-@layer properties {
-  @supports ((-webkit-hyphens: none) and (not (margin-trim: block))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
-    *, ::before, ::after, ::backdrop {
-      --tw-font-weight: initial;
-    }
-  }
 }

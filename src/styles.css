@@ -8,27 +8,6 @@
   position: relative;
 }
 
-/* DHTMLX sets its own font size, weight and case, from variables on :root. The text classes of a
-   node set those variables for the widgets in it, and let buttons and inputs take the style. */
-.dhxe-node:is(.text-xs, .text-sm, .text-base, .text-lg, .text-xl, .text-2xl) {
-  --dhx-font-size-normal: 1em;
-  --dhx-font-size-small: 0.86em;
-  --dhx-font-size-large: 1.14em;
-}
-
-.dhxe-node.font-normal { --dhx-font-weight-regular: 400; --dhx-font-weight-medium: 400; }
-.dhxe-node.font-medium { --dhx-font-weight-regular: 500; --dhx-font-weight-medium: 500; }
-.dhxe-node.font-semibold { --dhx-font-weight-regular: 600; --dhx-font-weight-medium: 600; }
-.dhxe-node.font-bold { --dhx-font-weight-regular: 700; --dhx-font-weight-medium: 700; }
-
-.dhxe-node:is(.italic, .not-italic) :is(button, input, textarea) {
-  font-style: inherit;
-}
-
-.dhxe-node:is(.uppercase, .normal-case) .dhx_button {
-  text-transform: inherit;
-}
-
 /* A part of the tree stopped: red, at the top, never hidden. */
 .dhxe-error {
   margin: 0 0 8px;

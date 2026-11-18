@@ -2,9 +2,9 @@ import { Schema } from "effect"
 
 /**
  * The few Tailwind classes that a node may have: spacing, a place for a node such as a floating
- * button, the alignment of the children of a frame, and the size and style of text. No colors and
- * no theme: the page decides those. `scripts/utilities.ts` builds the CSS of
- * exactly this list into `src/utilities.css`, so a page needs no Tailwind.
+ * button, and the alignment of the children of a frame. No colors, no fonts and no theme: the page
+ * decides those. `scripts/utilities.ts` builds the CSS of exactly this list into `src/utilities.css`,
+ * so a page needs no Tailwind.
  */
 const SCALE = ["0", "0.5", "1", "2", "3", "4", "6", "8"] as const
 const SPACING = ["m", "mx", "my", "mt", "mr", "mb", "ml", "p", "px", "py", "pt", "pr", "pb", "pl", "gap"] as const
@@ -29,17 +29,7 @@ export const UTILITIES = [
   "flex-wrap",
   "flex-nowrap",
   ...(["start", "center", "end", "stretch", "baseline"] as const).map((place) => `items-${place}` as const),
-  ...(["start", "center", "end", "between", "around", "evenly"] as const).map((place) => `justify-${place}` as const),
-  // Text: the font of the page, in another size, weight or style.
-  ...(["xs", "sm", "base", "lg", "xl", "2xl"] as const).map((size) => `text-${size}` as const),
-  ...(["normal", "medium", "semibold", "bold"] as const).map((weight) => `font-${weight}` as const),
-  "italic",
-  "not-italic",
-  "text-left",
-  "text-center",
-  "text-right",
-  "uppercase",
-  "normal-case"
+  ...(["start", "center", "end", "between", "around", "evenly"] as const).map((place) => `justify-${place}` as const)
 ] as const
 
 export type Utility = (typeof UTILITIES)[number]
